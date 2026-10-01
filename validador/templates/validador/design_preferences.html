@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f7fb">
+    <title>Elige el estilo | ValidaciónPro</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous">
+    <style>
+      body { min-height: 100vh; background: #f5f7fb; color: #182230; }
+      .wizard { max-width: 980px; }
+      .theme-choice { height: 100%; }
+      .theme-choice .card { height: 100%; cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .15s; }
+      .theme-choice .card:hover { transform: translateY(-2px); }
+      .theme-choice input:checked + .card { border: 2px solid #3157d5; box-shadow: 0 0 0 .2rem rgba(49, 87, 213, .12); }
+      .swatch { height: 88px; border-radius: .65rem; }
+      .swatch-minimal { background: linear-gradient(135deg, #f5f7fb 0 65%, #3157d5 65%); }
+      .swatch-abstract { background: radial-gradient(circle at 72% 30%, #f0abfc 0 18%, transparent 19%), linear-gradient(125deg, #16152b, #5141a5 58%, #16b8a6); }
+      .swatch-corporate { background: linear-gradient(135deg, #e7f4ee 0 50%, #176b52 50% 72%, #d8a14a 72%); }
+      .brand-mark { display: inline-grid; width: 2.4rem; height: 2.4rem; place-items: center; border-radius: .7rem; background: #eaf0ff; color: #3157d5; font-weight: 800; }
+      .btn-primary { background: #3157d5; border-color: #3157d5; }
+    </style>
+  </head>
+  <body class="py-4 py-lg-5">
+    <main class="container wizard">
+      <a class="text-decoration-none text-dark fw-semibold d-inline-flex align-items-center gap-2 mb-4" href="/">
+        <span class="brand-mark">V</span> ValidaciónPro
+      </a>
+      <div class="mb-4">
+        <p class="text-primary small fw-bold text-uppercase mb-2">Personaliza tu espacio</p>
+        <h1 class="display-6 fw-bold">¿Qué estilo prefieres?</h1>
+        <p class="text-secondary">Elige una dirección visual. Podrás cambiarla después mientras evoluciona el producto.</p>
+      </div>
+
+      {% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="design_description" value="{{ design_description|default:'' }}">
+        <div class="row g-3 mb-4">
+          <div class="col-12 col-md-4">
+            <label class="theme-choice d-block">
+              <input class="visually-hidden" type="radio" name="theme" value="minimal" {% if selected_theme == "minimal" %}checked{% endif %}>
+              <span class="card border rounded-4 p-3">
+                <span class="swatch swatch-minimal mb-3"></span>
+                <span class="fw-bold">Minimalista</span>
+                <span class="small text-secondary mt-1">Limpio, sobrio y enfocado en los datos.</span>
+              </span>
+            </label>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="theme-choice d-block">
+              <input class="visually-hidden" type="radio" name="theme" value="abstract" {% if selected_theme == "abstract" %}checked{% endif %}>
+              <span class="card border rounded-4 p-3">
+                <span class="swatch swatch-abstract mb-3"></span>
+                <span class="fw-bold">Abstracto</span>
+                <span class="small text-secondary mt-1">Más expresivo, creativo y con personalidad visual.</span>
+              </span>
+            </label>
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="theme-choice d-block">
+              <input class="visually-hidden" type="radio" name="theme" value="corporate" {% if selected_theme == "corporate" %}checked{% endif %}>
+              <span class="card border rounded-4 p-3">
+                <span class="swatch swatch-corporate mb-3"></span>
+                <span class="fw-bold">Corporativo</span>
+                <span class="small text-secondary mt-1">Formal, cálido y pensado para operaciones empresariales.</span>
+              </span>
+            </label>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-lg w-100 fw-semibold" type="submit" name="action" value="save">Usar este estilo</button>
+      </form>
+
+      <section class="bg-white border rounded-4 p-3 p-md-4 mt-4">
+        <h2 class="h5 fw-bold">¿Quieres que la IA te recomiende?</h2>
+        {% if ai_enabled %}
+          <p class="small text-secondary">Describe el ambiente que buscas. {{ ai_provider_label }} solo recomendará uno de los estilos mostrados; no generará ni cambiará código. Comprueba que el servicio y el modelo estén disponibles antes de pedir una recomendación.</p>
+          <form method="post">
+            {% csrf_token %}
+            <label class="form-label fw-semibold" for="design-description">Describe tu preferencia</label>
+            <textarea class="form-control mb-3" id="design-description" name="design_description" rows="3" maxlength="500" placeholder="Ej.: una interfaz clara y sobria para un equipo de finanzas...">{{ design_description|default:'' }}</textarea>
+            <button class="btn btn-outline-primary fw-semibold" type="submit" name="action" value="recommend">Recomendar y aplicar diseño automáticamente</button>
+          </form>
+          <p class="form-text mt-2 mb-0">No incluyas datos de clientes, credenciales ni información confidencial.</p>
+        {% else %}
+          <p class="text-secondary small mb-0">Configura un proveedor de IA válido para activar recomendaciones. Puedes escoger cualquiera de los estilos manualmente.</p>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>

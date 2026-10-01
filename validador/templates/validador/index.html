@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f7fb">
+    <title>Analizador de datos | Operaciones</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous">
+    <style>
+      :root {
+        --app-bg: #f5f7fb;
+        --brand: #3157d5;
+        --brand-dark: #2444b5;
+        --ink: #182230;
+        --muted: #667085;
+        --line: #e5e9f0;
+      }
+
+      body {
+        min-height: 100vh;
+        background: var(--app-bg);
+        color: var(--ink);
+      }
+
+      body[data-theme="abstract"] {
+        --app-bg: #17162a;
+        --brand: #a78bfa;
+        --brand-dark: #8b5cf6;
+        --ink: #f4f1ff;
+        --muted: #c0b9dc;
+        --line: #393650;
+      }
+
+      body[data-theme="abstract"] .app-navbar,
+      body[data-theme="abstract"] .surface-card,
+      body[data-theme="abstract"] .metric-card {
+        background: #222039;
+        color: var(--ink);
+      }
+
+      body[data-theme="abstract"] .text-secondary,
+      body[data-theme="abstract"] .small,
+      body[data-theme="abstract"] .form-text {
+        color: #c0b9dc !important;
+      }
+
+      body[data-theme="abstract"] .upload-box { background: #292644; }
+      body[data-theme="abstract"] .table { --bs-table-bg: #222039; --bs-table-color: #f4f1ff; --bs-table-hover-bg: #302d4b; --bs-table-hover-color: #fff; }
+      body[data-theme="abstract"] .table-light { --bs-table-bg: #302d4b; --bs-table-color: #eee9ff; }
+
+      body[data-theme="corporate"] {
+        --app-bg: #f2f7f4;
+        --brand: #176b52;
+        --brand-dark: #10563f;
+        --ink: #1e3029;
+        --muted: #5c7167;
+        --line: #d8e6de;
+      }
+
+      .app-navbar {
+        background: #fff;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .brand-mark {
+        display: inline-grid;
+        width: 2.25rem;
+        height: 2.25rem;
+        place-items: center;
+        border-radius: .7rem;
+        background: #eaf0ff;
+        color: var(--brand);
+        font-weight: 800;
+      }
+
+      .page-shell {
+        max-width: 1120px;
+      }
+
+      .eyebrow {
+        color: var(--brand);
+        font-size: .75rem;
+        font-weight: 700;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+      }
+
+      .surface-card {
+        border: 1px solid var(--line);
+        border-radius: 1rem;
+        background: #fff;
+        box-shadow: 0 8px 24px rgba(16, 24, 40, .04);
+      }
+
+      .upload-box {
+        border: 1px dashed #b8c5dc;
+        border-radius: .85rem;
+        background: #fafbff;
+        padding: 1.25rem;
+      }
+
+      .upload-icon {
+        display: inline-grid;
+        width: 2.75rem;
+        height: 2.75rem;
+        place-items: center;
+        border-radius: .8rem;
+        background: #eaf0ff;
+        color: var(--brand);
+        font-size: 1.3rem;
+        font-weight: 700;
+      }
+
+      .metric-card {
+        height: 100%;
+        border: 1px solid var(--line);
+        border-radius: .85rem;
+        padding: 1rem;
+      }
+
+      .metric-value {
+        font-size: 1.75rem;
+        font-weight: 750;
+        letter-spacing: -.04em;
+      }
+
+      .text-brand { color: var(--brand); }
+      .btn-primary { background: var(--brand); border-color: var(--brand); }
+      .btn-primary:hover, .btn-primary:focus { background: var(--brand-dark); border-color: var(--brand-dark); }
+      .table thead th { color: #475467; font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+      .table td { vertical-align: middle; }
+      .error-cell { min-width: 220px; max-width: 360px; }
+      code { color: #344054; }
+      .chart-point { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(80px, 3fr) auto; align-items: center; gap: .75rem; }
+      .chart-track { height: .8rem; overflow: hidden; border-radius: 999px; background: var(--line); }
+      .chart-bar { height: 100%; min-width: 2px; border-radius: inherit; background: var(--brand); }
+      body[data-theme="abstract"] .chart-track { background: #393650; }
+    </style>
+  </head>
+  <body data-theme="{{ design_theme }}">
+    <nav class="navbar app-navbar">
+      <div class="container page-shell">
+        <a class="navbar-brand d-flex align-items-center gap-2 fw-semibold mb-0" href="/">
+          <span class="brand-mark">V</span>
+          <span>Analizador<span class="text-brand">Pro</span></span>
+        </a>
+        <div class="d-flex align-items-center gap-3">
+          <span class="small text-secondary d-none d-sm-inline">{{ request.user.username }}</span>
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'design_preferences' %}">Cambiar diseño</a>
+          <span class="badge rounded-pill text-bg-light border text-secondary fw-medium">Prototipo interno</span>
+          <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-outline-secondary" type="submit">Cerrar sesión</button>
+          </form>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container page-shell py-4 py-lg-5">
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-success" role="status">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+      <header class="mb-4 mb-lg-5">
+        <p class="eyebrow mb-2">Operaciones · Análisis de datos</p>
+        <h1 class="display-6 fw-bold mb-2">Analizador de datos</h1>
+        <p class="text-secondary mb-0">
+          Carga tablas CSV, TSV o Excel. La aplicación detecta sus columnas y Ollama recomienda una gráfica.
+        </p>
+      </header>
+
+      <div class="row g-4">
+        <div class="col-12 col-lg-5">
+          <section class="surface-card p-3 p-md-4 h-100">
+            <div class="d-flex align-items-start gap-3 mb-4">
+              <span class="upload-icon" aria-hidden="true">↑</span>
+              <div>
+                <h2 class="h5 fw-bold mb-1">Cargar tabla</h2>
+                <p class="small text-secondary mb-0">Elige una tabla con encabezados en la primera fila.</p>
+              </div>
+            </div>
+
+            <form method="post" enctype="multipart/form-data">
+              {% csrf_token %}
+              <div class="upload-box mb-3">
+                <label for="archivo" class="form-label fw-semibold">Archivo de datos</label>
+                <input
+                  id="archivo"
+                  name="archivo"
+                  class="form-control"
+                  type="file"
+                  accept=".csv,.tsv,.xlsx"
+                  aria-describedby="fileHelp"
+                  required>
+                <div id="fileHelp" class="form-text">
+                  Formatos CSV/TSV/XLSX · Máximo {{ max_upload_mb }} MB · Hasta {{ max_rows }} filas
+                </div>
+              </div>
+
+              <button class="btn btn-primary w-100 fw-semibold" type="submit">
+                Analizar tabla y generar gráfico
+              </button>
+            </form>
+            <p class="small text-secondary mt-3 mb-0">
+              Ollama solo recibe los encabezados y tipos inferidos; las celdas permanecen locales.
+            </p>
+
+            {% if error %}
+              <div class="alert alert-danger mt-3 mb-0" role="alert">{{ error }}</div>
+            {% endif %}
+
+            <hr class="my-4">
+            <h3 class="h6 fw-bold">Detección automática</h3>
+            <p class="small text-secondary mb-0">Se infieren columnas de texto, categorías, fechas e importes. Los archivos de gastos conservan sus reglas de validación y restricciones de SharePoint.</p>
+          </section>
+        </div>
+
+        <div class="col-12 col-lg-7">
+          {% if rows != None %}
+            <section class="surface-card p-3 p-md-4">
+              <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+                <div>
+                  <p class="eyebrow mb-1">Resultado del análisis</p>
+                  <h2 class="h4 fw-bold mb-0">Resumen del análisis</h2>
+                </div>
+                {% if report_url %}
+                  <a class="btn btn-outline-primary fw-semibold" href="{{ report_url }}">Descargar CSV</a>
+                {% endif %}
+              </div>
+
+              <div class="row g-3 mb-4">
+                <div class="{% if expense_validation %}col-4{% else %}col-6{% endif %}">
+                  <div class="metric-card">
+                    <div class="small text-secondary mb-1">Filas</div>
+                    <div class="metric-value">{{ total_rows }}</div>
+                  </div>
+                </div>
+                <div class="{% if expense_validation %}col-4{% else %}col-6{% endif %}">
+                  <div class="metric-card">
+                    <div class="small text-secondary mb-1">Columnas detectadas</div>
+                    <div class="metric-value">{{ table_headers|length }}</div>
+                  </div>
+                </div>
+                {% if expense_validation %}
+                  <div class="col-4">
+                    <div class="metric-card">
+                      <div class="small text-secondary mb-1">Correctas</div>
+                      <div class="metric-value text-success">{{ valid_rows }}</div>
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
+
+              {% if chart_notice %}
+                <div class="alert alert-warning" role="status">{{ chart_notice }}</div>
+              {% endif %}
+
+              {% if chart %}
+                <section class="surface-card p-3 mb-4" aria-labelledby="chart-title">
+                  <div class="mb-3">
+                    <p class="eyebrow mb-1">Gráfico sugerido por {{ recommendation_source }}</p>
+                    <h3 id="chart-title" class="h5 fw-bold mb-0">{{ chart.title }}</h3>
+                  </div>
+                  <div class="d-grid gap-2" role="img" aria-label="{{ chart.title }}">
+                    {% for point in chart.points %}
+                      <div class="chart-point">
+                        <span class="small text-truncate" title="{{ point.label }}">{{ point.label }}</span>
+                        <div class="chart-track" aria-hidden="true">
+                          <div class="chart-bar" style="width: {{ point.width }}%"></div>
+                        </div>
+                        <strong class="small">{{ point.value }}</strong>
+                      </div>
+                    {% endfor %}
+                  </div>
+                  <p class="small text-secondary mt-3 mb-0">Eje: {{ chart.x_label }} · Medida: {{ chart.y_label }}.</p>
+                </section>
+              {% elif total_rows %}
+                <div class="alert alert-info">No se encontraron datos suficientes para crear un gráfico.</div>
+              {% endif %}
+
+              {% if expense_validation and issue_counts %}
+                <div class="alert alert-warning">
+                  <h3 class="h6 fw-bold mb-2">Inconsistencias detectadas</h3>
+                  <ul class="mb-0 ps-3">
+                    {% for category, count in issue_counts.items %}
+                      <li>{{ category }}: {{ count }} fila(s)</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% elif expense_validation %}
+                <div class="alert alert-success">No se detectaron inconsistencias en este archivo.</div>
+              {% endif %}
+
+              {% if sharepoint_not_applicable %}
+                <div class="alert alert-light border small text-secondary" role="note">
+                  Esta tabla no es una plantilla de gastos y no se enviará a SharePoint.
+                </div>
+              {% elif sharepoint_upload %}
+                <div class="alert alert-success" role="status">
+                  <h3 class="h6 fw-bold mb-1">Archivo guardado en SharePoint</h3>
+                  <p class="mb-0">{{ sharepoint_upload.name }}
+                    {% if sharepoint_upload.web_url %}
+                      · <a href="{{ sharepoint_upload.web_url }}" target="_blank" rel="noopener noreferrer">Abrir archivo</a>
+                    {% endif %}
+                  </p>
+                </div>
+              {% elif sharepoint_blocked %}
+                <div class="alert alert-warning" role="status">
+                  El archivo no se subió: corrige todas las filas marcadas como “Revisar” y vuelve a cargarlo.
+                </div>
+              {% elif sharepoint_error %}
+                <div class="alert alert-danger" role="alert">{{ sharepoint_error }}</div>
+              {% elif not sharepoint_enabled %}
+                <div class="alert alert-light border small text-secondary" role="note">
+                  SharePoint aún no está configurado. Completa el archivo <code>.env</code>
+                  con las credenciales de Microsoft Entra ID y el sitio/biblioteca de destino;
+                  después reinicia la aplicación. El archivo no se ha subido.
+                </div>
+              {% endif %}
+
+              {% if rows %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h3 class="h6 fw-bold mb-0">Vista previa</h3>
+                  {% if total_rows > 200 %}<span class="small text-secondary">Primeras 200 de {{ total_rows }}</span>{% endif %}
+                </div>
+                <div class="table-responsive border rounded-3">
+                  <table class="table table-hover table-sm mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        {% for header in table_headers %}<th>{{ header }}</th>{% endfor %}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for row in rows %}
+                        <tr>{% for value in row %}<td>{{ value }}</td>{% endfor %}</tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+                <p class="small text-secondary mt-2 mb-0">El enlace del reporte vence en 10 minutos.</p>
+              {% endif %}
+            </section>
+          {% else %}
+            <section class="surface-card p-4 p-md-5 h-100 d-flex flex-column justify-content-center">
+              <p class="eyebrow mb-2">Flujo de trabajo</p>
+              <h2 class="h3 fw-bold mb-3">De tabla a gráfico</h2>
+              <div class="d-flex gap-3 mb-3">
+                <span class="badge rounded-pill text-bg-primary align-self-start">1</span>
+                <div><h3 class="h6 fw-bold mb-1">Carga tus datos</h3><p class="text-secondary small mb-0">Acepta archivos CSV, TSV y Excel con columnas variables.</p></div>
+              </div>
+              <div class="d-flex gap-3 mb-3">
+                <span class="badge rounded-pill text-bg-primary align-self-start">2</span>
+                <div><h3 class="h6 fw-bold mb-1">Interpreta columnas</h3><p class="text-secondary small mb-0">Ollama identifica encabezados y recomienda una comparación.</p></div>
+              </div>
+              <div class="d-flex gap-3">
+                <span class="badge rounded-pill text-bg-primary align-self-start">3</span>
+                <div><h3 class="h6 fw-bold mb-1">Visualiza tendencias</h3><p class="text-secondary small mb-0">Consulta un gráfico y descarga la tabla dinámica.</p></div>
+              </div>
+              <hr class="my-4">
+              <h3 class="h6 fw-bold">Ejemplo de CSV</h3>
+              <pre class="bg-light border rounded-3 p-3 small mb-0"><code>fecha,proveedor,numero_factura,moneda,subtotal,impuesto,total
+2026-09-01,Proveedor Ejemplo,F-001,MXN,1000,160,1160</code></pre>
+            </section>
+          {% endif %}
+        </div>
+      </div>
+      <footer class="text-center small text-secondary py-4">
+        Prototipo local · Verifica los resultados antes de registrarlos en sistemas empresariales.
+      </footer>
+    </main>
+  </body>
+</html>
