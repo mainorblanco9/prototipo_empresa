@@ -1185,3 +1185,29 @@ def mobile_capture(request):
 @login_required
 def issued_invoice_list(request):
     return render(request, "validador/issued_invoice_list.html")
+
+
+@login_required
+def invoice_wizard(request):
+    return render(request, "validador/invoice_wizard.html")
+
+
+@login_required
+def integrations(request):
+    from .models import ApiKey
+
+    new_key = None
+    if request.method == "POST":
+        if request.POST.get("action") == "revoke":
+            ApiKey.objects.filter(
+                owner=request.user, pk=request.POST.get("key_id"), revoked_at__isnull=True
+            ).update(revoked_at=timezone.now())
+        else:
+            name = (request.POST.get("name") or "Mi sistema").strip()
+            _, new_key = ApiKey.issue(request.user, name)
+    context = {
+        "keys": ApiKey.objects.filter(owner=request.user),
+        "new_key": new_key,
+        "base_url": request.build_absolute_uri("/").rstrip("/"),
+    }
+    return render(request, "validador/integrations.html", context)

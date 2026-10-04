@@ -56,6 +56,8 @@ urlpatterns = [
         name="api_invoice_ai_analysis",
     ),
     path("api/v1/ai/review-draft/", api.DraftReviewView.as_view(), name="api_ai_review_draft"),
+    path("facturas/nueva/", views.invoice_wizard, name="invoice_wizard"),
+    path("integraciones/", views.integrations, name="integrations"),
     path("manifest.webmanifest", pwa.manifest, name="pwa_manifest"),
     path("sw.js", pwa.service_worker, name="pwa_service_worker"),
     path("icon.svg", pwa.icon, name="pwa_icon"),

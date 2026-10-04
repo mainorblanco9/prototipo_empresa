@@ -170,3 +170,41 @@ class IssuedInvoiceStatusEvent(models.Model):
 
     class Meta:
         ordering = ("created_at", "id")
+
+
+class ApiKey(models.Model):
+    """Credencial para que un proveedor envie facturas desde su sistema."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="api_keys"
+    )
+    name = models.CharField(max_length=80)
+    prefix = models.CharField(max_length=16, db_index=True)
+    key_hash = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    @staticmethod
+    def hash_key(raw):
+        import hashlib
+
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    @classmethod
+    def issue(cls, owner, name):
+        import secrets
+
+        raw = "gb_" + secrets.token_urlsafe(32)
+        key = cls.objects.create(
+            owner=owner, name=name[:80], prefix=raw[:10], key_hash=cls.hash_key(raw)
+        )
+        return key, raw
+
+    @property
+    def is_active(self):
+        return self.revoked_at is None

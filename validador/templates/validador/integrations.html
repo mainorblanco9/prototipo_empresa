@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#003087">
+  {% include 'validador/_pwa_head.html' %}
+  <title>Integraciones | GuanaBill</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  {% include 'validador/_theme.html' %}
+  <style>pre.api { background:#001435; color:#cfe6ff; border-radius:1rem; padding:1rem; font-size:.8rem; overflow:auto; }</style>
+</head>
+<body>
+<nav class="navbar app-navbar bg-white px-3 py-2">
+  <a class="navbar-brand" href="{% url 'index' %}"><span class="brand-mark d-inline-grid px-2 me-1">G</span>Guana<span class="text-primary">Bill</span></a>
+  <span class="gb-env">{{ gb_environment_label }}</span>
+  <a class="btn btn-outline-primary btn-sm" href="{% url 'issued_invoice_list' %}">Mis facturas</a>
+</nav>
+<main class="container py-4" style="max-width:860px">
+  <h1 class="fw-bold">Integraciones para proveedores</h1>
+  <p class="text-secondary">Envía facturas desde tu propio sistema por REST. Tres vías, un mismo modelo: <strong>API</strong>, <strong>Excel</strong> (<a href="{% url 'invoice_workspace' %}">carga masiva</a>) o <strong>factura a factura</strong> (<a href="{% url 'invoice_wizard' %}">asistente paso a paso</a>).</p>
+
+  {% if new_key %}
+  <div class="alert alert-success">
+    <strong>Copia tu API key ahora; no se vuelve a mostrar.</strong>
+    <pre class="api mt-2 mb-0">{{ new_key }}</pre>
+  </div>
+  {% endif %}
+
+  <div class="card p-3 mb-4">
+    <h2 class="h5 fw-bold">API keys</h2>
+    <form method="post" class="d-flex gap-2 mb-3">{% csrf_token %}
+      <input class="form-control" name="name" placeholder="Nombre del sistema (ej. ERP contabilidad)" maxlength="80">
+      <button class="btn btn-primary text-nowrap" type="submit">Crear key</button>
+    </form>
+    <table class="table align-middle mb-0">
+      <thead><tr><th>Nombre</th><th>Prefijo</th><th>Último uso</th><th></th></tr></thead>
+      <tbody>
+      {% for k in keys %}
+        <tr>
+          <td>{{ k.name }}</td><td><code>{{ k.prefix }}…</code></td>
+          <td>{{ k.last_used_at|date:"d/m/Y H:i"|default:"nunca" }}</td>
+          <td class="text-end">
+            {% if k.is_active %}
+            <form method="post">{% csrf_token %}<input type="hidden" name="action" value="revoke"><input type="hidden" name="key_id" value="{{ k.id }}">
+              <button class="btn btn-outline-primary btn-sm" type="submit">Revocar</button></form>
+            {% else %}<span class="text-secondary small">Revocada</span>{% endif %}
+          </td>
+        </tr>
+      {% empty %}<tr><td colspan="4" class="text-secondary">Aún no hay keys.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card p-3 mb-4">
+    <h2 class="h5 fw-bold">Crear una factura</h2>
+    <p class="small text-secondary">Reenviar el mismo <code>client_id</code> es idempotente: devuelve la factura existente. Precios con IVA incluido; <code>tax_rate</code>: 13, 4, 2, 1, 0 o exempt.</p>
+    <pre class="api">curl -X POST {{ base_url }}/api/v1/invoices/ \
+  -H "Authorization: Bearer gb_TU_KEY" -H "Content-Type: application/json" \
+  -d '{
+    "client_id": "erp-000123",
+    "issuer_name": "Comercial Guanacaste S.A.", "issuer_id": "3101123456",
+    "receiver_name": "Cliente de Prueba S.A.", "receiver_id": "3101654321",
+    "issue_date": "2026-01-15",
+    "lines": [{"description": "Servicio de consultoría", "quantity": 1, "unit_price": "113000", "tax_rate": "13"}]
+  }'</pre>
+    <h3 class="h6 fw-bold mt-3">Marcar lista y enviar a Hacienda</h3>
+    <pre class="api">curl -X POST {{ base_url }}/api/v1/invoices/ID/transition/ -H "Authorization: Bearer gb_TU_KEY" \
+  -H "Content-Type: application/json" -d '{"to": "ready", "version": 1}'
+curl -X POST {{ base_url }}/api/v1/invoices/ID/submit/ -H "Authorization: Bearer gb_TU_KEY"
+curl {{ base_url }}/api/v1/invoices/ID/ -H "Authorization: Bearer gb_TU_KEY"   # estado, clave y respuesta</pre>
+    <h3 class="h6 fw-bold mt-3">Python</h3>
+    <pre class="api">import requests
+r = requests.post("{{ base_url }}/api/v1/invoices/", headers={"Authorization": "Bearer gb_TU_KEY"},
+                  json={"client_id": "erp-000123", "issuer_name": "...", "issuer_id": "...",
+                        "receiver_name": "...", "receiver_id": "...", "issue_date": "2026-01-15",
+                        "lines": [{"description": "Servicio", "quantity": 1, "unit_price": "113000", "tax_rate": "13"}]})
+print(r.json()["status"])</pre>
+    <h3 class="h6 fw-bold mt-3">Node.js</h3>
+    <pre class="api mb-0">const r = await fetch("{{ base_url }}/api/v1/invoices/", {
+  method: "POST",
+  headers: { Authorization: "Bearer gb_TU_KEY", "Content-Type": "application/json" },
+  body: JSON.stringify({ client_id: "erp-000123", issuer_name: "...", issuer_id: "...",
+    receiver_name: "...", receiver_id: "...", issue_date: "2026-01-15",
+    lines: [{ description: "Servicio", quantity: 1, unit_price: "113000", tax_rate: "13" }] }),
+});</pre>
+  </div>
+
+  <div class="alert alert-warning small">
+    <strong>{{ gb_environment_label }}:</strong> el envío va al simulador local de Hacienda. El XML aún no se firma (XAdES) y la conexión real a producción está bloqueada hasta completarlo.
+  </div>
+</main>
+</body>
+</html>

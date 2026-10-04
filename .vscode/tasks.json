@@ -60,7 +60,7 @@
     {
       "id": "bind",
       "type": "pickString",
-      "description": "Direcci?n de Django (0.0.0.0 para probar desde el tel?fono)",
+      "description": "Dirección de Django (0.0.0.0 para probar desde el teléfono)",
       "options": ["127.0.0.1:8000", "0.0.0.0:8000"],
       "default": "127.0.0.1:8000"
     }

@@ -54,6 +54,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "validador.context_processors.branding",
             ],
         },
     },
@@ -87,6 +88,7 @@ OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rs
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:3b")
 OLLAMA_TIMEOUT_SECONDS = int(os.environ.get("OLLAMA_TIMEOUT_SECONDS", "90"))
 
+HACIENDA_MODE = os.environ.get("HACIENDA_MODE", "local")
 GATEWAY_URL = os.environ.get("GATEWAY_URL", "http://127.0.0.1:3000").rstrip("/")
 SHAREPOINT_TENANT_ID = os.environ.get("SHAREPOINT_TENANT_ID", "")
 SHAREPOINT_CLIENT_ID = os.environ.get("SHAREPOINT_CLIENT_ID", "")
@@ -107,6 +109,7 @@ CACHES = {
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "validador.authentication.ApiKeyAuthentication",
         "rest_framework.authentication.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],

@@ -471,7 +471,7 @@ class IssuedInvoiceViewSet(GenericViewSet):
         )
 
     def ai_analysis(self, request, pk=None):
-        """An?lisis por IA (Ollama local) de la respuesta de Hacienda."""
+        """Análisis por IA (Ollama local) de la respuesta de Hacienda."""
         invoice = self.get_object()
         if invoice.status not in (
             IssuedInvoice.Status.ACCEPTED,
@@ -479,7 +479,7 @@ class IssuedInvoiceViewSet(GenericViewSet):
             IssuedInvoice.Status.PROCESSING,
             IssuedInvoice.Status.QUEUED,
         ):
-            return _conflict("A?n no hay respuesta de Hacienda que analizar.")
+            return _conflict("Aún no hay respuesta de Hacienda que analizar.")
         text, used_ai = ai_assist.analyze_hacienda_result(invoice)
         IssuedInvoice.objects.filter(pk=invoice.pk, owner=request.user).update(
             ai_analysis=text
@@ -542,10 +542,11 @@ class DraftReviewSerializer(serializers.Serializer):
     receiver_id = serializers.CharField(max_length=100, default="0")
     issue_date = serializers.DateField()
     lines = LineSerializer(many=True, allow_empty=False, max_length=MAX_INVOICE_LINES)
+    use_ai = serializers.BooleanField(default=True)
 
 
 class DraftReviewView(APIView):
-    """Costo exacto y revisi?n por IA de un borrador sin guardarlo."""
+    """Costo exacto y revisión por IA de un borrador sin guardarlo."""
 
     throttle_scope = "ai"
 
@@ -556,6 +557,10 @@ class DraftReviewView(APIView):
             document = _build_document(serializer.validated_data)
         except IssuedInvoiceDraftError as exc:
             return _bad_request(str(exc))
+        if not serializer.validated_data["use_ai"]:
+            return Response(
+                {"cost": ai_assist.estimate_cost(document), "ai_available": True, "advice": "", "error": ""}
+            )
         return Response(ai_assist.review_draft(document))
 
 

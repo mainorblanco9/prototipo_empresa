@@ -342,17 +342,30 @@ Arranque: `.\run_local.ps1` (o `-Lan` para usar el teléfono en la misma red con
   `POST /invoices/<id>/submit`.
 - Apps nativas: ver `mobile/README.md`.
 ## IA local (Ollama) en el flujo
-- **Captura m?vil**: bot?n *Costo y revisi?n con IA* (`POST /api/v1/ai/review-draft/`). El costo
+- **Captura móvil**: botón *Costo y revisión con IA* (`POST /api/v1/ai/review-draft/`). El costo
   (subtotal + IVA = total) lo calcula Django; Ollama sugiere mejoras a descripciones, cantidades y
   tarifas a confirmar.
 - **Respuesta de Hacienda**: tras *Enviar a Hacienda* se analiza el resultado (aceptada/rechazada)
   con `POST /api/v1/invoices/<id>/ai-analysis/`; el texto se guarda en `ai_analysis`. Si Ollama no
-  responde, se muestra un an?lisis b?sico sin IA.
-- Solo se usa Ollama en `localhost` (`OLLAMA_MODEL`, por defecto `qwen2.5:3b`). La elecci?n de
-  estilos y la correcci?n de tablas ya existentes siguen en `/diseno/` y `/facturas/`.
+  responde, se muestra un análisis básico sin IA.
+- Solo se usa Ollama en `localhost` (`OLLAMA_MODEL`, por defecto `qwen2.5:3b`). La elección de
+  estilos y la corrección de tablas ya existentes siguen en `/diseno/` y `/facturas/`.
 
 ## Desarrollo en VS Code
 Abre la carpeta del proyecto. `Ctrl+Shift+B`/*Run Task*: **Iniciar todo (Django + Gateway)**,
 **Pruebas Django**, **Pruebas gateway**, **Ollama: verificar modelo**. En *Run and Debug* usa el
 compuesto **Django + Gateway** para depurar ambos. Primera vez: `pip install -r requirements.txt`,
 `python manage.py migrate` y `ollama pull qwen2.5:3b`.
+
+## GuanaBill: tres vías de ingreso (sandbox local)
+
+| Vía | Dónde |
+|---|---|
+| API REST de proveedores | `/integraciones/` (crear API keys, ejemplos curl/Python/Node). Usa `Authorization: Bearer gb_...` o `X-API-Key`. |
+| Excel / CSV | `/facturas/` |
+| Factura a factura | `/facturas/nueva/` (asistente paso a paso que llama a `POST /api/v1/invoices/`) |
+
+Datos de prueba locales: `python manage.py seed_guanabill` crea el usuario `proveedor_prueba`
+(`Proveedor123!`), una API key y 3 facturas de ejemplo. Solo funciona con `HACIENDA_MODE=local`.
+Las API keys se guardan hasheadas (SHA-256) y se muestran una sola vez.
+

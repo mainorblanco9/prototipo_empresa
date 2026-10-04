@@ -17,7 +17,7 @@ ICON_SVG = (
 )
 
 SERVICE_WORKER_JS = """
-const CACHE = "analizadorpro-shell-v2";
+const CACHE = "guanabill-shell-v2";
 const CAPTURE_URL = "/facturas/movil/";
 const OFFLINE_URL = "/offline/";
 
@@ -64,11 +64,10 @@ self.addEventListener("fetch", event => {
 @require_GET
 def manifest(request):
     data = {
-        "name": "AnalizadorPro · Facturación local",
-        "short_name": "AnalizadorPro",
+        "name": "GuanaBill · Facturación electrónica",
+        "short_name": "GuanaBill",
         "description": (
-            "Prototipo local para preparar y dar seguimiento a facturas en "
-            "colones. Envía solo al simulador local de Hacienda."
+            "Gestiona y envía facturas electrónicas a Hacienda: por API, Excel o factura a factura."
         ),
         "lang": "es-CR",
         "start_url": "/facturas/movil/",

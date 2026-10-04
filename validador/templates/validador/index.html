@@ -145,19 +145,20 @@
       .chart-bar.negative { background: #d64545; }
       body[data-theme="abstract"] .chart-track { background: #393650; }
     </style>
+    {% include 'validador/_theme.html' %}
   </head>
   <body data-theme="{{ design_theme }}">
     <nav class="navbar app-navbar">
       <div class="container page-shell">
         <a class="navbar-brand d-flex align-items-center gap-2 fw-semibold mb-0" href="/">
-          <span class="brand-mark">V</span>
+          <span class="brand-mark">G</span>
           <span>Analizador<span class="text-brand">Pro</span></span>
         </a>
         <div class="d-flex align-items-center gap-3">
           <span class="small text-secondary d-none d-sm-inline">{{ request.user.username }}</span>
           <a class="btn btn-sm btn-outline-primary" href="{% url 'design_preferences' %}">Cambiar diseño</a>
           <a class="btn btn-sm btn-outline-primary" href="{% url 'invoice_workspace' %}">Preparar facturas</a>
-          <span class="badge rounded-pill text-bg-light border text-secondary fw-medium">Prototipo interno</span>
+          <span class="gb-env">{{ gb_environment_label }}</span>
           <form method="post" action="{% url 'logout' %}">
             {% csrf_token %}
             <button class="btn btn-sm btn-outline-secondary" type="submit">Cerrar sesión</button>
@@ -420,7 +421,7 @@
         </div>
       </div>
       <footer class="text-center small text-secondary py-4">
-        Prototipo local · Verifica los resultados antes de registrarlos en sistemas empresariales.
+        GuanaBill ? · Verifica los resultados antes de registrarlos en sistemas empresariales.
       </footer>
     </main>
     {% if matrix_chart %}

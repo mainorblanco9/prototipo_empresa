@@ -405,3 +405,62 @@ class AiAssistTests(HaciendaFlowTests):
             self.assertTrue(self.client.post(url).json()["ai_used"])
         detail = self.client.get(reverse("api_invoice_detail", args=[data["id"]])).json()
         self.assertEqual(detail["ai_analysis"], "Causa: receptor")
+
+
+class ApiKeyTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("prov", password="x-Pass-123")
+
+    def _payload(self):
+        return {
+            "client_id": str(uuid.uuid4()),
+            "issuer_name": "Emisor", "issuer_id": "3101123456",
+            "receiver_name": "Receptor", "receiver_id": "3101654321",
+            "issue_date": "2026-01-15",
+            "lines": [{"description": "Servicio", "quantity": 1, "unit_price": "113", "tax_rate": "13"}],
+        }
+
+    def test_api_key_creates_invoice_with_bearer_and_header(self):
+        from .models import ApiKey
+
+        key, raw = ApiKey.issue(self.user, "ERP")
+        self.assertNotIn(raw, key.key_hash)
+        client = APIClient()
+        res = client.post("/api/v1/invoices/", self._payload(), format="json", HTTP_AUTHORIZATION=f"Bearer {raw}")
+        self.assertEqual(res.status_code, 201, res.content)
+        res = client.get("/api/v1/invoices/", HTTP_X_API_KEY=raw)
+        self.assertEqual(res.status_code, 200)
+        key.refresh_from_db()
+        self.assertIsNotNone(key.last_used_at)
+
+    def test_invalid_or_revoked_key_is_rejected(self):
+        from django.utils import timezone
+
+        from .models import ApiKey
+
+        client = APIClient()
+        self.assertEqual(client.get("/api/v1/invoices/", HTTP_X_API_KEY="gb_nope").status_code, 401)
+        key, raw = ApiKey.issue(self.user, "ERP")
+        key.revoked_at = timezone.now()
+        key.save()
+        self.assertEqual(client.get("/api/v1/invoices/", HTTP_X_API_KEY=raw).status_code, 401)
+
+    def test_integrations_page_issues_key_once_and_wizard_renders(self):
+        self.client.force_login(self.user)
+        res = self.client.post(reverse("integrations"), {"name": "Mi ERP"})
+        self.assertContains(res, "gb_")
+        self.assertEqual(self.user.api_keys.count(), 1)
+        self.assertNotContains(self.client.get(reverse("integrations")), "no se vuelve a mostrar")
+        self.assertContains(self.client.get(reverse("invoice_wizard")), "GuanaBill")
+
+    def test_review_draft_without_ai_returns_cost_only(self):
+        self.client.force_login(self.user)
+        res = self.client.post("/api/v1/ai/review-draft/", {**self._payload(), "use_ai": False}, content_type="application/json")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()["cost"]["total"], "113.00")
+
+    def test_seed_command(self):
+        from django.core.management import call_command
+
+        call_command("seed_guanabill", stdout=__import__("io").StringIO())
+        self.assertEqual(IssuedInvoice.objects.filter(owner__username="proveedor_prueba").count(), 3)

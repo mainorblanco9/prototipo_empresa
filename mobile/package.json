@@ -1,8 +1,8 @@
 {
-  "name": "analizadorpro-mobile",
+  "name": "guanabill-mobile",
   "version": "0.1.0",
   "private": true,
-  "description": "Envoltorio nativo (Android/iOS) de la PWA de AnalizadorPro con Capacitor",
+  "description": "Envoltorio nativo (Android/iOS) de la PWA de GuanaBill con Capacitor",
   "scripts": {
     "add:android": "cap add android",
     "add:ios": "cap add ios",

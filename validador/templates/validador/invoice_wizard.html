@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#003087">
+  {% include 'validador/_pwa_head.html' %}
+  <title>Nueva factura | GuanaBill</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  {% include 'validador/_theme.html' %}
+  <style>
+    .wiz { max-width: 640px; }
+    .dots { display:flex; gap:.4rem; margin-bottom:1.5rem; }
+    .dots span { flex:1; height:6px; border-radius:99px; background:#d5dfec; }
+    .dots span.on { background: var(--brand-dark); }
+    .step { display:none; } .step.on { display:block; }
+    .big-q { font-size:1.6rem; font-weight:800; letter-spacing:-.02em; }
+    pre.api { background:#001435; color:#cfe6ff; border-radius:1rem; padding:1rem; font-size:.78rem; overflow:auto; }
+  </style>
+</head>
+<body>
+<nav class="navbar app-navbar bg-white px-3 py-2">
+  <a class="navbar-brand" href="{% url 'index' %}"><span class="brand-mark d-inline-grid px-2 me-1">G</span>Guana<span class="text-primary">Bill</span></a>
+  <span class="gb-env">{{ gb_environment_label }}</span>
+  <a class="btn btn-outline-primary btn-sm" href="{% url 'issued_invoice_list' %}">Mis facturas</a>
+</nav>
+<main class="container wiz py-4">
+  {% csrf_token %}
+  <div class="dots" id="dots"></div>
+  <form id="wiz" novalidate>
+    <section class="step on" data-step="0">
+      <p class="text-secondary mb-1">Paso 1 de 5</p>
+      <h1 class="big-q mb-3">¿Quién emite la factura?</h1>
+      <label class="form-label fw-semibold">Nombre o razón social del emisor</label>
+      <input class="form-control mb-3" id="issuer_name" value="Comercial Guanacaste S.A.">
+      <label class="form-label fw-semibold">Cédula jurídica o física</label>
+      <input class="form-control" id="issuer_id" inputmode="numeric" value="3101123456">
+    </section>
+    <section class="step" data-step="1">
+      <p class="text-secondary mb-1">Paso 2 de 5</p>
+      <h1 class="big-q mb-3">¿A quién se la emites?</h1>
+      <label class="form-label fw-semibold">Nombre del receptor</label>
+      <input class="form-control mb-3" id="receiver_name" value="Cliente de Prueba S.A.">
+      <label class="form-label fw-semibold">Identificación del receptor</label>
+      <input class="form-control mb-3" id="receiver_id" inputmode="numeric" value="3101654321">
+      <label class="form-label fw-semibold">Fecha de emisión</label>
+      <input class="form-control" id="issue_date" type="date">
+    </section>
+    <section class="step" data-step="2">
+      <p class="text-secondary mb-1">Paso 3 de 5</p>
+      <h1 class="big-q mb-3">¿Qué estás facturando?</h1>
+      <div id="lines"></div>
+      <button type="button" class="btn btn-outline-primary mt-2" id="add-line">+ Agregar línea</button>
+      <p class="small text-secondary mt-3">El precio es el final con IVA incluido; GuanaBill separa base e impuesto.</p>
+    </section>
+    <section class="step" data-step="3">
+      <p class="text-secondary mb-1">Paso 4 de 5</p>
+      <h1 class="big-q mb-3">Revisa el total</h1>
+      <div class="card p-3 mb-3"><div id="cost" class="fs-5 fw-bold">Calculando…</div></div>
+      <button type="button" class="btn btn-outline-primary mb-3" id="ai-btn">✨ Revisar con IA local</button>
+      <pre id="ai-text" class="small" style="white-space:pre-wrap;font:inherit"></pre>
+    </section>
+    <section class="step" data-step="4">
+      <p class="text-secondary mb-1">Paso 5 de 5</p>
+      <h1 class="big-q mb-3">Crear y validar</h1>
+      <p>La factura se crea con <code>POST /api/v1/invoices/</code>, la misma API que usan los proveedores.</p>
+      <div class="d-grid gap-2">
+        <button type="button" class="btn btn-outline-primary" id="save-btn">Crear factura (borrador)</button>
+        <button type="button" class="btn btn-primary" id="send-btn">Crear y enviar al sandbox de Hacienda</button>
+      </div>
+      <div id="result" class="mt-3"></div>
+      <pre class="api mt-3" id="payload" hidden></pre>
+    </section>
+    <div id="err" class="alert alert-danger mt-3" hidden></div>
+    <div class="d-flex justify-content-between mt-4">
+      <button type="button" class="btn btn-outline-primary" id="back">Atrás</button>
+      <button type="button" class="btn btn-primary" id="next">Continuar</button>
+    </div>
+  </form>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const steps = [...document.querySelectorAll(".step")];
+let cur = 0, created = null;
+$("issue_date").value = new Date().toISOString().slice(0, 10);
+$("dots").innerHTML = steps.map(() => "<span></span>").join("");
+const money = (n) => "₡" + Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2 });
+const csrf = () => document.querySelector("[name=csrfmiddlewaretoken]").value;
+
+function addLine(d = {}) {
+  const row = document.createElement("div");
+  row.className = "card p-3 mb-2 line";
+  row.innerHTML = `<input class="form-control mb-2 d" placeholder="Descripción" value="${d.description || ""}">
+    <div class="row g-2"><div class="col"><input class="form-control q" type="number" min="1" step="1" placeholder="Cantidad" value="${d.quantity || 1}"></div>
+    <div class="col"><input class="form-control p" type="number" min="0" step="0.01" placeholder="Precio con IVA" value="${d.unit_price || ""}"></div>
+    <div class="col"><select class="form-select t">${["13","4","2","1","0","exempt"].map(v => `<option value="${v}" ${v == (d.tax_rate || "13") ? "selected" : ""}>${v === "exempt" ? "Exento" : v + "%"}</option>`).join("")}</select></div></div>`;
+  $("lines").appendChild(row);
+}
+addLine({ description: "Servicio de consultoría", unit_price: "113000" });
+$("add-line").onclick = () => addLine();
+
+const body = () => ({
+  client_id: crypto.randomUUID(),
+  issuer_name: $("issuer_name").value.trim(), issuer_id: $("issuer_id").value.trim(),
+  receiver_name: $("receiver_name").value.trim(), receiver_id: $("receiver_id").value.trim(),
+  issue_date: $("issue_date").value,
+  lines: [...document.querySelectorAll(".line")].map(r => ({
+    description: r.querySelector(".d").value.trim(), quantity: r.querySelector(".q").value,
+    unit_price: r.querySelector(".p").value, tax_rate: r.querySelector(".t").value })),
+});
+async function api(path, payload, method = "POST") {
+  const res = await fetch(path, { method, credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() }, body: JSON.stringify(payload) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(JSON.stringify(data));
+  return data;
+}
+function show() {
+  steps.forEach((s, i) => s.classList.toggle("on", i === cur));
+  [...$("dots").children].forEach((d, i) => d.classList.toggle("on", i <= cur));
+  $("back").style.visibility = cur ? "visible" : "hidden";
+  $("next").style.display = cur === steps.length - 1 ? "none" : "";
+  $("err").hidden = true;
+}
+function validate() {
+  const b = body();
+  if (cur === 0 && (!b.issuer_name || !b.issuer_id)) return "Completa los datos del emisor.";
+  if (cur === 1 && (!b.receiver_name || !b.receiver_id || !b.issue_date)) return "Completa los datos del receptor.";
+  if (cur === 2 && b.lines.some(l => !l.description || !(+l.quantity > 0) || !(+l.unit_price >= 0) || l.unit_price === "")) return "Cada línea necesita descripción, cantidad y precio.";
+  return "";
+}
+async function review() {
+  $("cost").textContent = "Calculando…"; $("ai-text").textContent = "";
+  try {
+    const d = await api("/api/v1/ai/review-draft/", { ...body(), use_ai: false });
+    const c = d.cost || {};
+    $("cost").textContent = `Subtotal ${money(c.subtotal)} + IVA ${money(c.tax)} = ${money(c.total)}`;
+  } catch (e) { $("cost").textContent = "No se pudo calcular: " + e.message; }
+}
+$("ai-btn").onclick = async () => {
+  $("ai-text").textContent = "Analizando con IA local…";
+  try { const d = await api("/api/v1/ai/review-draft/", body()); $("ai-text").textContent = d.advice || d.analysis || ""; }
+  catch (e) { $("ai-text").textContent = "IA no disponible: " + e.message; }
+};
+$("next").onclick = () => {
+  const m = validate();
+  if (m) { $("err").textContent = m; $("err").hidden = false; return; }
+  cur++; show(); if (cur === 3) review();
+};
+$("back").onclick = () => { cur = Math.max(0, cur - 1); show(); };
+
+async function create(send) {
+  $("result").innerHTML = "Procesando…";
+  try {
+    if (!created) created = await api("/api/v1/invoices/", body());
+    $("payload").hidden = false; $("payload").textContent = JSON.stringify(created, null, 2);
+    let msg = `Factura creada · total ${money(created.total)}.`;
+    if (send) {
+      created = await api(`/api/v1/invoices/${created.id}/transition/`, { to: "ready", version: created.version });
+      await api(`/api/v1/invoices/${created.id}/submit/`, {});
+      msg += " Enviada al sandbox de Hacienda; revisa el resultado en Mis facturas.";
+    }
+    $("result").innerHTML = `<div class="alert alert-success">${msg} <a href="{% url 'issued_invoice_list' %}">Ver facturas</a></div>`;
+  } catch (e) { $("result").innerHTML = `<div class="alert alert-danger"></div>`; $("result").firstChild.textContent = e.message; }
+}
+$("save-btn").onclick = () => create(false);
+$("send-btn").onclick = () => create(true);
+show();
+</script>
+</body>
+</html>

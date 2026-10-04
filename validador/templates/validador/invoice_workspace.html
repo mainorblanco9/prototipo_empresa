@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f5f7fb">
     {% include 'validador/_pwa_head.html' %}
-    <title>Preparar facturas | AnalizadorPro</title>
+    <title>Preparar facturas | GuanaBill</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -79,12 +79,13 @@
         *,*::before,*::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
       }
     </style>
+    {% include 'validador/_theme.html' %}
   </head>
   <body>
     <nav class="navbar app-navbar">
       <div class="container page-shell d-flex justify-content-between align-items-center">
         <a class="navbar-brand d-flex align-items-center gap-2 fw-semibold mb-0" href="{% url 'index' %}">
-          <span class="brand-mark">V</span><span>Analizador<span class="text-primary">Pro</span></span>
+          <span class="brand-mark">G</span><span>Guana<span class="text-primary">Bill</span></span>
         </a>
         <div class="d-flex align-items-center gap-3">
           <span class="small text-secondary">{{ request.user.username }}</span>
@@ -112,6 +113,8 @@
           <span class="side-icon">+</span><span>Borrador emitido</span>
         </a>
         <a class="side-link" href="{% url 'mobile_capture' %}"><span class="side-icon">📱</span><span>Captura móvil</span></a>
+        <a class="side-link" href="{% url 'invoice_wizard' %}"><span class="side-icon">➕</span><span>Nueva factura</span></a>
+        <a class="side-link" href="{% url 'integrations' %}"><span class="side-icon">🔌</span><span>Integraciones API</span></a>
         <a class="side-link" href="{% url 'issued_invoice_list' %}"><span class="side-icon">➤</span><span>Enviar a Hacienda</span></a>
         <a class="side-link" href="{% url 'invoice_audit' %}">
           <span class="side-icon">≡</span><span>Bitácora</span>
@@ -157,7 +160,7 @@
             </form>
             <a class="btn btn-sm btn-outline-primary mt-3" href="{% url 'download_sample_invoices' %}">Descargar facturas ficticias de octubre (CSV)</a>
             <div class="alert alert-info small mt-3 mb-0">
-              Archivo de prueba: 3 facturas inventadas, moneda CRC, octubre de 2026. Los controles aplicados son reglas locales del prototipo, no certifican cumplimiento fiscal oficial. Con encabezados reconocidos, no se envían datos a Ollama.
+              Archivo de prueba: 3 facturas inventadas, moneda CRC, octubre de 2026. Los controles aplicados son reglas locales de GuanaBill, no certifican cumplimiento fiscal oficial. Con encabezados reconocidos, no se envían datos a Ollama.
             </div>
             {% if error %}
               <div class="alert {% if invoice_type_mismatch %}alert-warning{% else %}alert-danger{% endif %} mt-3 mb-0" role="alert">
@@ -170,7 +173,7 @@
           </section>
 
           <section class="surface-card p-3 p-md-4 mt-4">
-            <h2 class="h6 fw-bold">Controles locales del prototipo</h2>
+            <h2 class="h6 fw-bold">Controles locales de GuanaBill</h2>
             <ul class="small text-secondary mb-0">
               <li>Fecha, proveedor, número de factura y moneda CRC; otras monedas requieren revisión.</li>
               <li>Importes con separadores locales comunes, sin negativos y total igual a subtotal más impuesto.</li>
@@ -297,7 +300,7 @@
               <p class="eyebrow mb-2">Proceso local</p>
               <h2 class="h3 fw-bold mb-3">Analiza. Valida. Prepara.</h2>
               <p class="text-secondary">
-                Consulta importes y estados por mes y moneda. Si todas las facturas pasan los controles locales del prototipo, continúa al preparador del modelo; los lotes con observaciones quedan bloqueados hasta corregirlos.
+                Consulta importes y estados por mes y moneda. Si todas las facturas pasan los controles locales de GuanaBill, continúa al preparador del modelo; los lotes con observaciones quedan bloqueados hasta corregirlos.
               </p>
               <div class="alert alert-warning mb-0">
                 El modelo y la simulación son locales. Esta validación no certifica cumplimiento fiscal ni transmite documentos a TRIBU-CR/Hacienda.
