@@ -1,8 +1,10 @@
 ﻿from django.urls import path
 
-from . import api, app_views, invoice_import, pwa, views
+from . import api, app_views, invoice_import, openapi, pwa, views
 
 urlpatterns = [
+    path("api/v1/openapi.json", openapi.openapi_json, name="api_openapi"),
+    path("api/docs/", openapi.api_docs, name="api_docs"),
     path("api/v1/", api.ApiRootView.as_view(), name="api_root"),
     path("api/v1/auth/token/", api.TokenView.as_view(), name="api_token"),
     path(

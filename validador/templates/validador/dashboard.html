@@ -2,7 +2,7 @@
 {% block title %}Panel{% endblock %}
 {% block heading %}Panel{% endblock %}
 {% block content %}
-<div class="row g-3"><div class="col-12 col-xl-8">
+<div class="row g-3"><div class="col-12 col-xxl-8">
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3"><div class="gb-card gb-stat"><div class="n text-success">{{ accepted }}</div><div class="l">Aceptadas por Hacienda</div></div></div>
   <div class="col-6 col-md-3"><div class="gb-card gb-stat"><div class="n text-danger">{{ rejected }}</div><div class="l">Rechazadas</div></div></div>
@@ -51,13 +51,13 @@
   </div>
   <div class="small text-secondary mt-2">Cada factura se valida localmente y se envía al simulador de Hacienda (ATV). La firma XAdES y el CABYS real quedan para producción.</div>
 </div>
-</div><div class="col-12 col-xl-4">
-<div class="gb-card gb-fill">
+</div><div class="col-12 col-xxl-4">
+<div class="gb-card gb-fill-xxl">
   <div class="d-flex justify-content-between mb-2"><h2 class="h6 fw-bold m-0">Actividad reciente</h2><a class="small" href="{% url 'activity_log' %}">Ver bitácora</a></div>
-  <div class="gb-scroll"><table class="table gb-table mb-0">
+  <div class="gb-scroll"><table class="table gb-table gb-stack mb-0">
     <thead><tr><th>Fecha</th><th>Receptor</th><th class="text-end">Total</th><th>Estado</th></tr></thead>
     <tbody>{% for inv in recent %}
-      <tr><td>{{ inv.issue_date|date:"d/m/Y" }}</td><td>{{ inv.receiver_name }}</td><td class="text-end">₡{{ inv.total|floatformat:2 }}</td><td><span class="gb-badge {{ inv.status }}">{{ inv.get_status_display }}</span></td></tr>
+      <tr><td class="gb-sub">{{ inv.issue_date|date:"d/m/Y" }}</td><td class="gb-grow">{{ inv.receiver_name }}</td><td class="text-end">₡{{ inv.total|floatformat:2 }}</td><td><span class="gb-badge {{ inv.status }}">{{ inv.get_status_display }}</span></td></tr>
     {% empty %}<tr><td colspan="4" class="text-secondary">Aún no hay facturas. Crea la primera o importa un Excel.</td></tr>{% endfor %}</tbody>
   </table></div>
 </div>

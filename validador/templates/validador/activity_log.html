@@ -14,12 +14,12 @@
   </form>
 </div>
 <div class="gb-card">
-  <div class="table-responsive"><table class="table gb-table mb-0">
+  <div class="table-responsive"><table class="table gb-table gb-stack mb-0">
     <thead><tr><th>Fecha</th><th>Tipo</th><th>Resultado</th><th>Periodo</th><th>Detalle</th></tr></thead>
     <tbody>
     {% for i in items %}
-      <tr><td class="text-nowrap">{{ i.when|date:"d/m/Y H:i" }}</td><td>{{ i.kind }}</td>
-        <td><span class="gb-badge {{ i.tone }}">{{ i.title }}</span></td><td>{{ i.period }}</td><td class="small text-secondary" style="word-break:break-word">{{ i.detail }}</td></tr>
+      <tr><td class="text-nowrap gb-sub">{{ i.when|date:"d/m/Y H:i" }}</td><td class="gb-sub">{{ i.kind }}</td>
+        <td><span class="gb-badge {{ i.tone }}">{{ i.title }}</span></td><td class="gb-sub">{{ i.period }}</td><td class="small text-secondary gb-full" style="word-break:break-word">{{ i.detail }}</td></tr>
     {% empty %}<tr><td colspan="5" class="text-secondary">No hay registros con esos filtros.</td></tr>{% endfor %}
     </tbody>
   </table></div>

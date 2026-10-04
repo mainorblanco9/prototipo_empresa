@@ -1,0 +1,29 @@
+{% extends 'validador/_shell.html' %}
+{% block title %}Documentación API{% endblock %}
+{% block heading %}Documentación API · OpenAPI{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+<style>
+  .gb-swagger { background:#fff; border-radius:1.25rem; padding:.5rem; overflow-x:auto; }
+  .gb-swagger .swagger-ui .topbar { display:none; }
+  .gb-swagger .swagger-ui .wrapper { padding:0 .5rem; }
+  .gb-swagger .swagger-ui .opblock .opblock-summary-description { text-align:left; }
+  @media (max-width:575px) { .gb-swagger .swagger-ui .opblock-summary-path { font-size:.8rem; word-break:break-all; } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+  <a class="btn btn-outline-primary btn-sm" href="{{ spec_url }}" target="_blank" rel="noopener">openapi.json</a>
+  <a class="btn btn-outline-primary btn-sm" href="{% url 'integrations' %}">Crear API key</a>
+  <span class="small text-secondary">Pulsa <b>Authorize</b> y pega <code>gb_…</code> para probar las llamadas contra el sandbox local.</span>
+</div>
+<div class="gb-swagger"><div id="swagger"></div></div>
+<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>
+  window.ui = SwaggerUIBundle({
+    url: "{{ spec_url }}", dom_id: "#swagger", deepLinking: true, docExpansion: "list",
+    tagsSorter: "alpha", persistAuthorization: true, tryItOutEnabled: true,
+    requestInterceptor: function (r) { r.credentials = "same-origin"; return r; }
+  });
+</script>
+{% endblock %}

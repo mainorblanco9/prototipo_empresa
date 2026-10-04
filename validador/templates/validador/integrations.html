@@ -1,9 +1,14 @@
 {% extends 'validador/_shell.html' %}
 {% block title %}Integraciones{% endblock %}
 {% block heading %}Integraciones para proveedores{% endblock %}
-{% block head %}<style>pre.api { background:#001435; color:#cfe6ff; border-radius:1rem; padding:1rem; font-size:.8rem; overflow:auto; }</style>{% endblock %}
-{% block content %}<div style="max-width:860px">
+{% block head %}<style>pre.api { background:#001435; color:#cfe6ff; border-radius:1rem; padding:1rem; font-size:.8rem; overflow:auto; max-width:100%; }</style>{% endblock %}
+{% block content %}<div>
   <p class="text-secondary">Envía facturas desde tu propio sistema por REST. Tres vías, un mismo modelo: <strong>API</strong>, <strong>Excel</strong> (<a href="{% url 'invoice_workspace' %}">carga masiva</a>) o <strong>factura a factura</strong> (<a href="{% url 'invoice_wizard' %}">asistente paso a paso</a>).</p>
+
+  <div class="gb-card mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div><strong>Referencia interactiva OpenAPI 3</strong><div class="small text-secondary">Todos los endpoints, esquemas y ejemplos; prueba las llamadas desde el navegador.</div></div>
+    <div class="d-flex gap-2"><a class="btn btn-primary btn-sm" href="{% url 'api_docs' %}">Abrir documentación</a><a class="btn btn-outline-primary btn-sm" href="{% url 'api_openapi' %}" target="_blank" rel="noopener">openapi.json</a></div>
+  </div>
 
   {% if new_key %}
   <div class="alert alert-success">
@@ -12,13 +17,13 @@
   </div>
   {% endif %}
 
-  <div class="card p-3 mb-4">
+  <div class="gb-card mb-3">
     <h2 class="h5 fw-bold">API keys</h2>
-    <form method="post" class="d-flex gap-2 mb-3">{% csrf_token %}
+    <form method="post" class="d-flex flex-column flex-sm-row gap-2 mb-3">{% csrf_token %}
       <input class="form-control" name="name" placeholder="Nombre del sistema (ej. ERP contabilidad)" maxlength="80">
       <button class="btn btn-primary text-nowrap" type="submit">Crear key</button>
     </form>
-    <table class="table align-middle mb-0">
+    <div class="table-responsive"><table class="table align-middle mb-0">
       <thead><tr><th>Nombre</th><th>Prefijo</th><th>Último uso</th><th></th></tr></thead>
       <tbody>
       {% for k in keys %}
@@ -35,10 +40,10 @@
       {% empty %}<tr><td colspan="4" class="text-secondary">Aún no hay keys.</td></tr>
       {% endfor %}
       </tbody>
-    </table>
+    </table></div>
   </div>
 
-  <div class="card p-3 mb-4">
+  <div class="gb-card mb-3">
     <h2 class="h5 fw-bold">Crear una factura</h2>
     <p class="small text-secondary">Reenviar el mismo <code>client_id</code> es idempotente: devuelve la factura existente. Precios con IVA incluido; <code>tax_rate</code>: 13, 4, 2, 1, 0 o exempt.</p>
     <pre class="api">curl -X POST {{ base_url }}/api/v1/invoices/ \

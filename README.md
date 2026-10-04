@@ -397,3 +397,9 @@ Pruebas: `python manage.py test` y `cd gateway; npm test`.
 
 Ramas de trabajo parten de `dev`; los PR se abren hacia `dev` y `main` se actualiza solo desde `dev`.
 Antes de abrir un PR ejecuta las dos suites de pruebas. Nunca subas `.env`, `db.sqlite3` ni certificados.
+
+## OpenAPI y datos de prueba
+
+- Documentacion interactiva: `/api/docs/` (Swagger UI, requiere internet); especificacion: `/api/v1/openapi.json`.
+- Excel de prueba: `samples/guanabill_facturas_validas.xlsx` y `samples/guanabill_facturas_todo_tipo.xlsx` (regenerar con `python scripts/generar_excel_facturas.py`).
+- `pip install -r requirements-dev.txt` para validar la especificacion en los tests.

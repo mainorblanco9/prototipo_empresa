@@ -5,6 +5,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework.test import APIClient
 
+from . import hacienda
 from .models import IssuedInvoice
 
 
@@ -604,3 +605,41 @@ class HaciendaFlowPageTests(TestCase):
         response = self.client.get(reverse("hacienda_flow"))
         self.assertContains(response, "Firma XAdES-EPES")
         self.assertContains(response, "/recepcion/v1/recepcion")
+
+
+class SampleWorkbookAndOpenApiTests(HaciendaFlowTests):
+    def _upload(self, name, confirm=False):
+        from pathlib import Path
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        raw = (Path(__file__).resolve().parent.parent / "samples" / name).read_bytes()
+        f = SimpleUploadedFile(name, raw, content_type="application/octet-stream")
+        return self.client.post("/api/v1/invoices/import/", {"file": f, **({"confirm": "1"} if confirm else {})}).json()
+
+    def test_valid_sample_workbook_imports_and_passes_local_validation(self):
+        result = self._upload("guanabill_facturas_validas.xlsx", confirm=True)
+        self.assertEqual(result["with_errors"], 0, result)
+        self.assertEqual(result["created"], 25)
+        for invoice in IssuedInvoice.objects.exclude(client_id=self.invoice["client_id"]):
+            self.assertEqual(hacienda.validate_invoice(invoice), [], invoice.document["issuer"])
+
+    def test_full_sample_workbook_reports_expected_errors(self):
+        result = self._upload("guanabill_facturas_todo_tipo.xlsx")
+        self.assertEqual(result["with_errors"], 6, result)
+        self.assertEqual(result["valid"], 25 + 1 + 2)
+
+    def test_openapi_spec_is_valid_and_docs_require_login(self):
+        try:
+            from openapi_spec_validator import validate
+        except ImportError:
+            self.skipTest('Instala requirements-dev.txt')
+
+        anon = self.client_class()
+        spec = anon.get("/api/v1/openapi.json").json()
+        validate(spec)
+        self.assertIn("/api/v1/invoices/{id}/submit/", spec["paths"])
+        self.assertEqual(anon.get("/api/docs/").status_code, 302)
+        web = self.client_class()
+        web.force_login(get_user_model().objects.get(username="hacienda-user"))
+        self.assertContains(web.get("/api/docs/"), "swagger")

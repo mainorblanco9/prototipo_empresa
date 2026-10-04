@@ -1,17 +1,17 @@
-{% extends 'validador/_shell.html' %}
+﻿{% extends 'validador/_shell.html' %}
 {% block title %}Nueva factura{% endblock %}
 {% block heading %}Nueva factura{% endblock %}
 {% block head %}<style>
     .wiz { max-width: 640px; }
-    .dots { display:flex; gap:.4rem; margin-bottom:1.5rem; }
+    .gb-cr .it b { font-size:.92rem; overflow-wrap:anywhere; }\n    .dots { display:flex; gap:.4rem; margin-bottom:1.5rem; }
     .dots span { flex:1; height:6px; border-radius:99px; background:#d5dfec; }
     .dots span.on { background: var(--brand-dark); }
     .step { display:none; } .step.on { display:block; }
     .big-q { font-size:1.6rem; font-weight:800; letter-spacing:-.02em; }
     pre.api { background:#001435; color:#cfe6ff; border-radius:1rem; padding:1rem; font-size:.78rem; overflow:auto; }
   </style>{% endblock %}
-{% block content %}<div style="max-width:860px">
-  
+{% block content %}<div class="row g-3"><div class="col-12 col-lg-7 col-xl-8">
+  <div class="gb-card">
   <div class="dots" id="dots"></div>
   <form id="wiz" novalidate>
     <section class="step on" data-step="0">
@@ -63,7 +63,23 @@
       <button type="button" class="btn btn-primary" id="next">Continuar</button>
     </div>
   </form>
-</div>{% endblock %}
+  </div>
+</div>
+<aside class="col-12 col-lg-5 col-xl-4"><div class="gb-card gb-sticky" aria-live="polite">
+  <div class="small text-secondary fw-bold text-uppercase mb-2">Resumen en vivo</div>
+  <dl class="gb-dl" style="grid-template-columns:5rem 1fr">
+    <dt>Emisor</dt><dd id="s-issuer">—</dd><dt>Receptor</dt><dd id="s-receiver">—</dd><dt>Fecha</dt><dd id="s-date">—</dd><dt>Líneas</dt><dd id="s-lines">—</dd>
+  </dl>
+  <div class="gb-cr mt-3" style="grid-template-columns:1fr">
+    <div class="it">Subtotal<b id="s-sub">₡0,00</b></div><div class="it">IVA<b id="s-tax">₡0,00</b></div><div class="it">Total<b id="s-total">₡0,00</b></div>
+  </div>
+  <ul class="gb-hist mt-3 mb-0" style="list-style:none;padding:0">
+    <li id="c-issuer">○ Emisor con identificación válida (9, 10 o 11–12 dígitos)</li>
+    <li id="c-receiver">○ Receptor con identificación válida</li>
+    <li id="c-lines">○ Al menos una línea con precio</li>
+  </ul>
+  <div class="small text-secondary mt-2">Al enviar, Hacienda (simulador) recibe clave de 50 dígitos y XML v4.4.</div>
+</div></aside></div>{% endblock %}
 {% block scripts %}<script>
 const $ = (id) => document.getElementById(id);
 const steps = [...document.querySelectorAll(".step")];
@@ -151,5 +167,21 @@ async function create(send) {
 }
 $("save-btn").onclick = () => create(false);
 $("send-btn").onclick = () => create(true);
-show();
+function summary() {
+  const b = body(); let total = 0, tax = 0;
+  b.lines.forEach(l => { const g = (+l.quantity || 0) * (+l.unit_price || 0); const r = l.tax_rate === "exempt" ? 0 : +l.tax_rate; total += g; tax += g * r / (100 + r); });
+  $("s-issuer").textContent = b.issuer_name ? `${b.issuer_name} · ${b.issuer_id}` : "—";
+  $("s-receiver").textContent = b.receiver_name ? `${b.receiver_name} · ${b.receiver_id}` : "—";
+  $("s-date").textContent = b.issue_date ? b.issue_date.split("-").reverse().join("/") : "—";
+  $("s-lines").textContent = b.lines.length;
+  $("s-sub").textContent = money(total - tax); $("s-tax").textContent = money(tax); $("s-total").textContent = money(total);
+  const okId = (v) => [9, 10, 11, 12].includes(v.replace(/\D/g, "").length) && /^\d+$/.test(v);
+  const mark = (id, ok, text) => { $(id).textContent = (ok ? "✔ " : "○ ") + text; $(id).style.color = ok ? "#12a150" : ""; };
+  mark("c-issuer", okId(b.issuer_id), "Emisor con identificación válida (9, 10 o 11–12 dígitos)");
+  mark("c-receiver", okId(b.receiver_id), "Receptor con identificación válida");
+  mark("c-lines", b.lines.length > 0 && b.lines.every(l => l.description && l.unit_price !== "" && +l.unit_price >= 0), "Líneas completas con precio");
+}
+$("wiz").addEventListener("input", summary); $("wiz").addEventListener("change", summary);
+$("add-line").addEventListener("click", summary);
+summary(); show();
 </script>{% endblock %}
