@@ -44,10 +44,6 @@
           {% include "validador/_logo.html" with cls="h-10 w-10" %}
           <span class="text-xl font-extrabold">Guana<span class="text-sky-400">Bill</span></span>
         </div>
-        <span class="inline-flex items-center gap-2 rounded-full bg-amber-300/15 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-300">
-          <span class="h-1.5 w-1.5 rounded-full bg-amber-300"></span> {{ gb_environment_label }}
-        </span>
-        <h1 class="mt-4 text-3xl font-extrabold tracking-tight">Bienvenido de nuevo</h1>
         <p class="mt-2 text-sm text-white/60">Ingresa con la cuenta de prueba. En producción se desactiva.</p>
 
         {% if error %}<div role="alert" class="mt-5 rounded-xl border border-red-400/40 bg-red-500/15 px-4 py-3 text-sm text-red-200">{{ error }}</div>{% endif %}
