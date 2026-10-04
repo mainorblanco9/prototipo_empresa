@@ -60,8 +60,17 @@ def closures(request):
             message = (
                 ("success", f"Periodo {period} cerrado.")
                 if event.result == PeriodClosure.Result.CLOSED
-                else ("danger", f"No se pudo cerrar {period}: corrige los puntos marcados.")
+                else ("danger", f"No se pudo cerrar {period}. Usa las acciones sugeridas en cada punto marcado o pide ayuda al asistente.")
             )
+        elif action == "fix":
+            try:
+                result = periods.fix_period(owner, period, request.POST.get("fix", ""), request.user)
+                text = periods.FIX_ACTIONS[request.POST.get("fix")] + f": {result['changed']} factura(s)."
+                if result["skipped"]:
+                    text += " Sin cambio: " + "; ".join(result["skipped"][:3])
+                message = ("success" if result["changed"] else "warning", text)
+            except ValueError as exc:
+                message = ("danger", str(exc))
         elif action == "reopen":
             event = periods.reopen_period(owner, period, request.POST.get("note", ""))
             message = ("warning", f"Periodo {period} reabierto.") if event else ("danger", "El periodo no está cerrado.")
@@ -77,6 +86,7 @@ def closures(request):
         "period": period,
         "report": report,
         "message": message,
+        "fix_actions": periods.FIX_ACTIONS,
         "history": history[:30],
         "closed_periods": [e for e in status_by_period.values() if e.result == PeriodClosure.Result.CLOSED],
     }

@@ -83,6 +83,12 @@
     const d = await api(`/api/v1/invoices/${id}/ai-analysis/`, { method: "POST" });
     $("ai-text").textContent = (d.ai_used ? "" : "(IA no disponible; análisis básico)\n") + d.analysis;
   }
+  async function fixHelp(id) {
+    if ($("detail-body").hidden || selected !== id) await show({ id });
+    $("ai").hidden = false; $("ai-text").textContent = "Buscando cómo corregirla con IA local…";
+    const d = await api(`/api/v1/invoices/${id}/ai-fix/`, { method: "POST" });
+    $("ai-text").textContent = (d.ai_used ? "" : "(IA no disponible; guía básica)\n") + d.guidance;
+  }
   const post = (inv, to) => api(`/api/v1/invoices/${inv.id}/transition/`, { method: "POST", body: JSON.stringify({ to, version: inv.version }) });
 
   function row(inv) {
@@ -102,10 +108,15 @@
       const d = await api(`/api/v1/invoices/${inv.id}/validate/`, { method: "POST" });
       note(d.valid ? "✔ Validación local superada: lista para enviar (no se envió nada a Hacienda)." : "✖ Corrige antes de enviar: " + d.issues.map(i => i.message).join(" "));
     }, true);
+    if (["draft", "rejected"].includes(inv.status)) { const a = document.createElement("a"); a.className = "btn btn-sm btn-outline-primary me-1"; a.href = "{% url 'invoice_wizard' %}?editar=" + inv.id; a.textContent = "✏️ Editar"; actions.appendChild(a); }
     if (inv.status === "draft") { add("Marcar lista", () => post(inv, "ready")); add("Anular", () => post(inv, "cancelled"), true, { confirmTitle: "¿Anular la factura?", confirm: "La factura de " + inv.receiver_name + " quedará anulada y no se enviará a Hacienda.", confirmOk: "Anular", confirmDanger: "1" }); }
     if (["ready", "queued", "processing"].includes(inv.status)) add("Enviar", async () => { await api(`/api/v1/invoices/${inv.id}/submit/`, { method: "POST" }); await analyze(inv.id); }, false, { confirmTitle: "¿Enviar a Hacienda?", confirm: "Se enviará la factura de " + inv.receiver_name + " por " + Number(inv.total).toLocaleString("es-CR") + " a Hacienda.", confirmOk: "Enviar", confirmIcon: "📤" });
     if (["accepted", "rejected"].includes(inv.status)) add("✨ Analizar", () => analyze(inv.id), true, { confirmTitle: "¿Analizar con IA?", confirm: "La IA local revisará la respuesta de Hacienda. Puede tardar unos segundos.", confirmOk: "Analizar", confirmIcon: "✨" });
-    if (inv.status === "rejected") add("Corregir", () => post(inv, "draft"), true, { confirmTitle: "¿Volver a borrador?", confirm: "La factura rechazada volverá a borrador para corregirla.", confirmOk: "Corregir", confirmIcon: "✏️" });
+    if (inv.status === "rejected") {
+      add("✨ ¿Cómo corregirla?", () => fixHelp(inv.id), true);
+      add("Reenviar igual", async () => { await post(inv, "ready"); const r = await api(`/api/v1/invoices/${inv.id}/`); await api(`/api/v1/invoices/${inv.id}/submit/`, { method: "POST" }); await analyze(inv.id); }, true, { confirmTitle: "¿Reenviar sin cambios?", confirm: "Se enviará de nuevo a Hacienda con una clave nueva. Si el rechazo fue por un dato, conviene editarla antes.", confirmOk: "Reenviar", confirmIcon: "📤" });
+      add("Anular", () => post(inv, "cancelled"), true, { confirmTitle: "¿Anular la factura rechazada?", confirm: "Quedará anulada y no se enviará a Hacienda.", confirmOk: "Anular", confirmDanger: "1" });
+    }
     return tr;
   }
 

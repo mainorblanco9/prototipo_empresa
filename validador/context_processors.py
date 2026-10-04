@@ -7,6 +7,15 @@ from .models import UserDesignPreference
 def branding(request):
     mode = getattr(settings, "HACIENDA_MODE", "local")
     label = "" if mode == "local" else "Producción"
+    match = getattr(request, "resolver_match", None)
+    ai_context = {
+        "invoice_wizard": "manual",
+        "import_invoices": "excel",
+        "integrations": "api",
+        "api_docs": "api",
+        "closures": "cierre",
+        "issued_invoice_list": "facturas",
+    }.get(match.url_name if match else "", "general")
     theme = "minimal"
     user = getattr(request, "user", None)
     if user is not None and user.is_authenticated:
@@ -17,5 +26,6 @@ def branding(request):
         "gb_environment_label": label,
         "gb_hacienda_mode": mode,
         "gb_theme": theme,
+        "gb_ai_context": ai_context,
         "gb_themes": [{"key": key, **info} for key, info in THEMES.items()],
     }

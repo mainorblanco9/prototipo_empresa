@@ -107,7 +107,7 @@ class IssuedInvoice(models.Model):
         Status.QUEUED: {Status.PROCESSING, Status.ACCEPTED, Status.REJECTED},
         Status.PROCESSING: {Status.ACCEPTED, Status.REJECTED},
         Status.ACCEPTED: set(),
-        Status.REJECTED: {Status.DRAFT},
+        Status.REJECTED: {Status.DRAFT, Status.READY, Status.CANCELLED},
     }
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

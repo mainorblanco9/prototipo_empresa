@@ -62,6 +62,12 @@ urlpatterns = [
         api.IssuedInvoiceViewSet.as_view({"post": "ai_analysis"}),
         name="api_invoice_ai_analysis",
     ),
+    path(
+        "api/v1/invoices/<uuid:pk>/ai-fix/",
+        api.IssuedInvoiceViewSet.as_view({"post": "ai_fix"}),
+        name="api_invoice_ai_fix",
+    ),
+    path("api/v1/ai/assistant/", api.AssistantView.as_view(), name="api_ai_assistant"),
     path("api/v1/ai/review-draft/", api.DraftReviewView.as_view(), name="api_ai_review_draft"),
     path("facturas/nueva/", views.invoice_wizard, name="invoice_wizard"),
     path("integraciones/", views.integrations, name="integrations"),

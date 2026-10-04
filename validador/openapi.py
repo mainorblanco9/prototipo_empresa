@@ -122,7 +122,7 @@ def build_spec(server_url="http://127.0.0.1:8001"):
         "/api/v1/invoices/{id}/": {
             "get": _op("Consultar una factura", "Estado, clave, documento y respuesta de Hacienda.", inv,
                        {"200": _json(_ref("InvoiceDetail")), "404": _err("No existe")}, path_id=True, operation_id="getInvoice"),
-            "put": _op("Actualizar un borrador", "Requiere `version` para control de concurrencia.", inv,
+            "put": _op("Actualizar un borrador o rechazada", "Requiere `version`. Si la factura estaba rechazada por Hacienda vuelve a borrador (se limpia la clave) para corregirla y reenviarla.", inv,
                        {"200": _json(_ref("InvoiceDetail")), "409": _err("Versión desactualizada o no editable")},
                        body=_json_body("InvoiceInput"), path_id=True, operation_id="updateInvoice"),
         },
@@ -163,6 +163,16 @@ def build_spec(server_url="http://127.0.0.1:8001"):
             "post": _op("Análisis por IA de la respuesta", "Explica con Ollama por qué fue aceptada o rechazada.", ai,
                         {"200": _json({"type": "object", "properties": {"analysis": {"type": "string"}, "ai_used": {"type": "boolean"}}}), "409": _err("Aún no hay respuesta de Hacienda")},
                         path_id=True, operation_id="aiAnalysis"),
+        },
+        "/api/v1/invoices/{id}/ai-fix/": {
+            "post": _op("Guía de corrección por IA", "Explica con la IA local qué corregir en una factura con problemas o rechazada (con respaldo fijo si Ollama no está activo).", ai,
+                        {"200": _json({"type": "object", "properties": {"guidance": {"type": "string"}, "ai_used": {"type": "boolean"}, "steps": {"type": "array", "items": {"type": "string"}}, "issues": {"type": "array", "items": {"type": "string"}}}})},
+                        path_id=True, operation_id="aiFix"),
+        },
+        "/api/v1/ai/assistant/": {
+            "post": _op("Asistente de proceso", "Describe el proceso y guía al usuario según el canal: manual, excel, api, cierre, facturas o general.", ai,
+                        {"200": _json({"type": "object", "properties": {"answer": {"type": "string"}, "ai_used": {"type": "boolean"}, "steps": {"type": "array", "items": {"type": "string"}}}})},
+                        body=_json_body("Assistant", {"context": "cierre", "question": "¿Qué me falta para cerrar?", "period": "2026-10"}), operation_id="aiAssistant"),
         },
         "/api/v1/ai/review-draft/": {
             "post": _op("Revisar un borrador", "Costo exacto y consejos de IA sin guardar la factura.", ai,

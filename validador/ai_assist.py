@@ -110,3 +110,142 @@ def analyze_hacienda_result(invoice):
         return generate_local_text(SYSTEM, prompt, max_tokens=500), True
     except AIProviderError:
         return fallback_hacienda_analysis(invoice.status, invoice.hacienda_message), False
+
+
+PROCESS = {
+    "manual": (
+        "Canal manual: el usuario digita la factura en el asistente de 5 pasos "
+        "(emisor, receptor y fecha, líneas con precio final con IVA, revisión del total, crear). "
+        "Se guarda como borrador, se valida localmente, se marca lista y se envía a Hacienda, "
+        "que responde aceptado o rechazado."
+    ),
+    "excel": (
+        "Canal Excel: se sube un .xlsx o .csv con una fila por línea (columnas factura, emisor, "
+        "cedula_emisor, receptor, cedula_receptor, fecha, descripcion, cantidad, precio_con_iva, iva). "
+        "Se valida el archivo, se ven los errores por fila y se crean como borradores solo las facturas válidas."
+    ),
+    "api": (
+        "Canal API REST: el proveedor usa una API key (Authorization: Bearer gb_...) y llama "
+        "POST /api/v1/invoices/ (con client_id para evitar duplicados), luego /validate/, "
+        "transition a ready y /submit/. La documentación está en /api/docs/."
+    ),
+    "cierre": (
+        "Cierre de periodo: antes de cerrar el mes no deben quedar borradores, facturas en proceso ni "
+        "rechazadas. Las rechazadas se corrigen y reenvían, o se anulan. Un periodo cerrado no admite "
+        "cambios hasta reabrirlo."
+    ),
+    "facturas": (
+        "Facturas: Borrador -> Listo -> Recibido -> Aceptado o Rechazado. Una factura rechazada se puede "
+        "editar y reenviar (recibe nueva clave) o anular. Una aceptada ya no se modifica."
+    ),
+    "general": (
+        "GuanaBill recibe facturas por tres canales (manual, Excel y API REST), las valida, las envía a "
+        "Hacienda, guarda cada respuesta en la bitácora y permite cerrar el mes."
+    ),
+}
+
+GUIDE_STEPS = {
+    "manual": [
+        "Escribe emisor y receptor; puedes guardar favoritos para no repetirlos.",
+        "Agrega cada línea con el precio final (IVA incluido) y su tarifa.",
+        "Revisa el total y pide la revisión con IA antes de crear.",
+        "Crea el borrador o envíalo directo a Hacienda.",
+    ],
+    "excel": [
+        "Descarga la plantilla o usa los archivos de la carpeta samples.",
+        "Sube el archivo y revisa el resultado fila por fila.",
+        "Corrige las filas con error y vuelve a validar.",
+        "Crea las facturas válidas y envíalas desde Facturas.",
+    ],
+    "api": [
+        "Crea una API key en Integraciones.",
+        "Envía POST /api/v1/invoices/ con un client_id único.",
+        "Valida con /validate/ y envía con /submit/.",
+        "Consulta /history/ y /ai-analysis/ para ver la respuesta de Hacienda.",
+    ],
+    "cierre": [
+        "Envía las facturas pendientes.",
+        "Corrige o anula las rechazadas.",
+        "Espera las que están en proceso.",
+        "Valida y cierra el periodo.",
+    ],
+    "facturas": [
+        "Valida y marca lista cada borrador.",
+        "Envía a Hacienda y revisa la respuesta.",
+        "Si fue rechazada, usa Editar con ayuda de la IA y reenvía.",
+    ],
+    "general": ["Elige un canal de ingreso: manual, Excel o API.", "Envía a Hacienda.", "Revisa la bitácora y cierra el mes."],
+}
+
+REJECTION_HINTS = {
+    "-37": "Verifica la actividad económica del emisor.",
+    "-43": "Revisa que el código CABYS de cada línea exista en el catálogo vigente.",
+    "-52": "Recalcula el IVA: el total de impuesto debe coincidir con la suma de las líneas.",
+    "-64": "Confirma que la identificación del receptor esté inscrita en Hacienda.",
+    "-79": "Revisa que la tarifa de IVA de cada línea sea la correcta.",
+}
+
+CONTEXT_LABELS = {k: k for k in PROCESS}
+
+
+def rejection_code(message):
+    import re
+
+    found = re.search(r"\[(-\d+)\]", message or "")
+    return found.group(1) if found else ""
+
+
+def facts_for(owner, period=None):
+    from django.db.models import Count
+
+    from . import periods
+    from .models import IssuedInvoice
+
+    counts = {r["status"]: r["n"] for r in owner.issued_invoices.values("status").annotate(n=Count("id"))}
+    labels = dict(IssuedInvoice.Status.choices)
+    text = "Facturas por estado: " + (", ".join(f"{labels.get(k, k)}={v}" for k, v in counts.items()) or "ninguna")
+    if period and periods.parse_period(period):
+        report = periods.validate_period(owner, period)
+        text += f"\nCierre {period}: " + (" | ".join(report["issues"]) or "sin bloqueos, listo para cerrar")
+    return text
+
+
+def fix_guidance(invoice, issues):
+    """Pasos concretos para corregir una factura rechazada o con errores locales."""
+    code = rejection_code(invoice.hacienda_message)
+    steps = [i["message"] if isinstance(i, dict) else str(i) for i in issues]
+    if code in REJECTION_HINTS:
+        steps.append(REJECTION_HINTS[code])
+    steps += [
+        "Pulsa Editar, corrige los datos y guarda: la factura vuelve a borrador.",
+        "Valida, marca lista y reenvía; recibirá una nueva clave.",
+        "Si la factura no corresponde, anúlala.",
+    ]
+    fallback = "Cómo corregirla:\n" + "\n".join(f"- {s}" for s in steps)
+    prompt = (
+        f"La factura fue rechazada por Hacienda. Mensaje: {invoice.hacienda_message or '(sin detalle)'}\n"
+        f"Problemas de validación local: {'; '.join(steps[:len(issues)]) or 'ninguno'}\n\n"
+        f"{_document_summary(invoice.document)}\n\n"
+        "Indica en 3 a 5 viñetas qué campos concretos de la factura conviene cambiar y por qué, "
+        "y qué hacer después (editar, validar, reenviar o anular). No menciones simuladores."
+    )
+    try:
+        return generate_local_text(SYSTEM, prompt, max_tokens=450), True, steps
+    except AIProviderError:
+        return fallback, False, steps
+
+
+def assistant_answer(context, question, facts="", extra=""):
+    context = context if context in PROCESS else "general"
+    steps = GUIDE_STEPS[context]
+    question = (question or "").strip()[:600] or "Guíame paso a paso en lo que estoy haciendo ahora."
+    prompt = (
+        f"Proceso: {PROCESS[context]}\n{facts}\n"
+        + (f"Datos de la pantalla: {extra[:1500]}\n" if extra else "")
+        + f"\nPregunta del usuario: {question}\n"
+        "Responde como guía de GuanaBill: indica el siguiente paso concreto y avisa de errores comunes."
+    )
+    try:
+        return generate_local_text(SYSTEM, prompt, max_tokens=450), True, steps
+    except AIProviderError:
+        return "Pasos recomendados:\n" + "\n".join(f"{i}. {s}" for i, s in enumerate(steps, 1)), False, steps

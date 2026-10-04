@@ -403,3 +403,10 @@ Antes de abrir un PR ejecuta las dos suites de pruebas. Nunca subas `.env`, `db.
 - Documentacion interactiva: `/api/docs/` (Swagger UI, requiere internet); especificacion: `/api/v1/openapi.json`.
 - Excel de prueba: `samples/guanabill_facturas_validas.xlsx` y `samples/guanabill_facturas_todo_tipo.xlsx` (regenerar con `python scripts/generar_excel_facturas.py`).
 - `pip install -r requirements-dev.txt` para validar la especificacion en los tests.
+
+## Flujo flexible de rechazos y asistente IA
+
+- Una factura rechazada por Hacienda se puede **editar** (vuelve a borrador y se limpia la clave), **reenviar** o **anular**.
+- El cierre de periodo ofrece acciones rápidas por cada punto bloqueante (marcar listas, devolver a borrador, anular rechazadas).
+- El botón **? Asistente** guía cada canal (manual, Excel, API REST, cierre) con la IA local; si Ollama no está activo responde con una guía fija.
+- Endpoints: `POST /api/v1/invoices/<id>/ai-fix/` y `POST /api/v1/ai/assistant/`.

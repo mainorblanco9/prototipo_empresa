@@ -14,6 +14,12 @@
   </style>{% endblock %}
 {% block content %}<div class="row g-3"><div class="col-12 col-lg-7 col-xl-8">
   <div class="gb-card">
+  <div class="alert alert-warning" id="edit-banner" hidden>
+    <strong id="edit-title">Editando factura</strong>
+    <div class="small mt-1" id="edit-msg"></div>
+    <button type="button" class="btn btn-sm btn-primary mt-2" id="edit-ai">✨ ¿Cómo la corrijo?</button>
+    <div class="small mt-2" id="edit-ai-out" style="white-space:pre-wrap"></div>
+  </div>
   <div class="dots" id="dots"></div>
   <form id="wiz" novalidate>
     <section class="step on" data-step="0">
@@ -65,6 +71,7 @@
     <div id="err" class="alert alert-danger mt-3" hidden></div>
     <div class="d-flex justify-content-between mt-4">
       <button type="button" class="btn btn-outline-primary" id="back">Atrás</button>
+      <button type="button" class="btn btn-link" id="step-help">✨ Ayuda con este paso</button>
       <button type="button" class="btn btn-primary" id="next">Continuar</button>
     </div>
   </form>
@@ -88,7 +95,7 @@
 {% block scripts %}<script>
 const $ = (id) => document.getElementById(id);
 const steps = [...document.querySelectorAll(".step")];
-let cur = 0, created = null;
+let cur = 0, created = null, editing = null;
 $("issue_date").value = new Date().toISOString().slice(0, 10);
 $("dots").innerHTML = steps.map(() => "<span></span>").join("");
 const money = (n) => "₡" + Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2 });
@@ -197,9 +204,11 @@ $("back").onclick = () => { cur = Math.max(0, cur - 1); show(); };
 async function create(send) {
   $("result").innerHTML = "Procesando…";
   try {
-    if (!created) created = await api("/api/v1/invoices/", body());
+    if (!created) created = editing
+      ? await api(`/api/v1/invoices/${editing.id}/`, { ...body(), version: editing.version }, "PUT")
+      : await api("/api/v1/invoices/", body());
     $("payload").hidden = false; $("payload").textContent = JSON.stringify(created, null, 2);
-    let msg = `Factura creada · total ${money(created.total)}.`;
+    let msg = `Factura ${editing ? "actualizada (vuelve a borrador)" : "creada"} · total ${money(created.total)}.`;
     if (send) {
       created = await api(`/api/v1/invoices/${created.id}/transition/`, { to: "ready", version: created.version });
       await api(`/api/v1/invoices/${created.id}/submit/`, {});
@@ -226,5 +235,33 @@ function summary() {
 }
 $("wiz").addEventListener("input", summary); $("wiz").addEventListener("change", summary);
 $("add-line").addEventListener("click", summary);
+const STEP_Q = ["¿Qué datos necesito del emisor?", "¿Qué datos necesito del receptor y qué fecha pongo?", "¿Cómo registro las líneas y qué tarifa de IVA uso?", "¿Está bien mi total?", "¿Qué pasa si creo o envío la factura?"];
+$("step-help").onclick = () => window.gbAsk(STEP_Q[cur] || "Guíame");
+window.gbAiExtra = () => { const b = body(); return `Paso ${cur + 1} de 5. Emisor: ${b.issuer_name} ${b.issuer_id}. Receptor: ${b.receiver_name} ${b.receiver_id}. Fecha ${b.issue_date}. Líneas: ` + b.lines.map(l => `${l.description} x${l.quantity} a ${l.unit_price} (${l.tax_rate})`).join("; "); };
+
+async function loadEditing(id) {
+  try {
+    const res = await fetch(`/api/v1/invoices/${id}/`, { credentials: "same-origin" });
+    if (!res.ok) throw new Error("No se encontró la factura.");
+    const inv = await res.json();
+    if (!["draft", "rejected"].includes(inv.status)) { $("err").textContent = "Solo se editan borradores o facturas rechazadas."; $("err").hidden = false; return; }
+    editing = inv; const d = inv.document;
+    $("issuer_name").value = d.issuer.name; $("issuer_id").value = d.issuer.identification;
+    $("receiver_name").value = d.receiver.name; $("receiver_id").value = d.receiver.identification;
+    $("issue_date").value = inv.issue_date; $("lines").innerHTML = "";
+    d.lines.forEach(l => addLine({ description: l.description, quantity: parseFloat(l.quantity), unit_price: l.unit_price_including_tax, tax_rate: l.tax_treatment === "exempt" ? "exempt" : l.tax_rate }));
+    $("edit-banner").hidden = false;
+    $("edit-title").textContent = inv.status === "rejected" ? "Corrigiendo factura rechazada por Hacienda" : "Editando borrador";
+    $("edit-msg").textContent = inv.hacienda_message || "Al guardar se actualizará la misma factura.";
+    $("edit-ai").onclick = async () => {
+      $("edit-ai-out").textContent = "Analizando con IA local…";
+      try { const r = await api(`/api/v1/invoices/${inv.id}/ai-fix/`, {}); $("edit-ai-out").textContent = (r.ai_used ? "" : "(IA no disponible; guía básica)\n") + r.guidance; }
+      catch (e) { $("edit-ai-out").textContent = e.message; }
+    };
+    summary();
+  } catch (e) { $("err").textContent = e.message; $("err").hidden = false; }
+}
+const editId = new URLSearchParams(location.search).get("editar");
+if (editId) loadEditing(editId);
 summary(); show();
 </script>{% endblock %}

@@ -281,28 +281,34 @@ class IssuedInvoiceViewSet(GenericViewSet):
         data = serializer.validated_data
         if "version" not in data:
             return _bad_request("Falta version para detectar cambios simultáneos.")
-        if invoice.status != IssuedInvoice.Status.DRAFT:
-            return _conflict("Solo se pueden editar facturas en borrador.")
+        editable = (IssuedInvoice.Status.DRAFT, IssuedInvoice.Status.REJECTED)
+        if invoice.status not in editable:
+            return _conflict("Solo se pueden editar facturas en borrador o rechazadas por Hacienda.")
         if periods.is_closed(request.user, periods.period_of(data["issue_date"])):
             return _conflict("El periodo de esa fecha está cerrado. Reabre el periodo en Cierres para modificarlo.")
         try:
             document = _build_document(data)
         except IssuedInvoiceDraftError as exc:
             return _bad_request(str(exc))
+        was_rejected = invoice.status == IssuedInvoice.Status.REJECTED
+        reset = {"status": IssuedInvoice.Status.DRAFT, "clave": "", "consecutive": None, "ai_analysis": ""} if was_rejected else {}
         updated = IssuedInvoice.objects.filter(
             pk=invoice.pk,
             owner=request.user,
             version=data["version"],
-            status=IssuedInvoice.Status.DRAFT,
+            status=invoice.status,
         ).update(
             version=data["version"] + 1,
             updated_at=timezone.now(),
+            **reset,
             **_document_fields(document),
         )
         if not updated:
             return _conflict(
                 "La factura cambió en otro dispositivo. Descarga la versión actual."
             )
+        if was_rejected:
+            self._record(request, invoice, IssuedInvoice.Status.REJECTED, IssuedInvoice.Status.DRAFT)
         invoice.refresh_from_db()
         return Response(InvoiceDetailSerializer(invoice).data)
 
@@ -510,6 +516,13 @@ class IssuedInvoiceViewSet(GenericViewSet):
         )
         return Response({"analysis": text, "ai_used": used_ai})
 
+    def ai_fix(self, request, pk=None):
+        """Guía de IA para corregir una factura rechazada o con errores de validación."""
+        invoice = self.get_object()
+        issues = hacienda.validate_invoice(invoice)
+        text, used_ai, steps = ai_assist.fix_guidance(invoice, issues)
+        return Response({"guidance": text, "ai_used": used_ai, "steps": steps, "issues": issues})
+
     def history(self, request, pk=None):
         invoice = self.get_object()
         return Response(
@@ -586,6 +599,29 @@ class DraftReviewView(APIView):
                 {"cost": ai_assist.estimate_cost(document), "ai_available": True, "advice": "", "error": ""}
             )
         return Response(ai_assist.review_draft(document))
+
+
+class AssistantSerializer(serializers.Serializer):
+    context = serializers.ChoiceField(choices=sorted(ai_assist.PROCESS), default="general")
+    question = serializers.CharField(required=False, allow_blank=True, max_length=600)
+    period = serializers.CharField(required=False, allow_blank=True, max_length=7)
+    extra = serializers.CharField(required=False, allow_blank=True, max_length=1500)
+
+
+class AssistantView(APIView):
+    """Guía de IA local para cualquier canal de ingreso (manual, Excel, API, cierre)."""
+
+    throttle_scope = "ai"
+
+    def post(self, request):
+        serializer = AssistantSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        facts = ai_assist.facts_for(request.user, data.get("period") or None)
+        answer, used_ai, steps = ai_assist.assistant_answer(
+            data["context"], data.get("question", ""), facts, data.get("extra", "")
+        )
+        return Response({"answer": answer, "ai_used": used_ai, "steps": steps})
 
 
 class ApiRootView(APIView):

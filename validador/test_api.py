@@ -356,6 +356,53 @@ class HaciendaFlowTests(TestCase):
         self.assertIn("/facturas/movil/", web.get(reverse("pwa_service_worker")).content.decode())
 
 
+class RejectedFlowTests(HaciendaFlowTests):
+    def _reject(self):
+        self.transition("ready")
+        data = self.queue().json()
+        self.client.post(reverse("api_invoice_hacienda_result", args=[data["id"]]),
+                         {"state": "rechazado", "message": "[-37] Error"}, format="json")
+
+    def test_edit_rejected_resets_to_draft(self):
+        self._reject()
+        inv = self.client.get(reverse("api_invoice_detail", args=[self.invoice["id"]])).json()
+        body = payload()
+        body["version"] = inv["version"]
+        res = self.client.put(reverse("api_invoice_detail", args=[inv["id"]]), body, format="json")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()["status"], "draft")
+        self.assertEqual(res.json()["clave"], "")
+
+    def test_rejected_can_be_cancelled(self):
+        self._reject()
+        self.assertEqual(self.transition("cancelled").status_code, 200)
+
+    def test_ai_fix_and_assistant_fallback(self):
+        from unittest import mock
+        from .ai_assist import AIProviderError
+
+        self._reject()
+        with mock.patch("validador.ai_assist.generate_local_text", side_effect=AIProviderError("off")):
+            res = self.client.post(reverse("api_invoice_ai_fix", args=[self.invoice["id"]]), {}, format="json")
+            self.assertEqual(res.status_code, 200)
+            self.assertFalse(res.json()["ai_used"])
+            self.assertTrue(res.json()["guidance"])
+            res = self.client.post(reverse("api_ai_assistant"), {"context": "cierre", "question": "?"}, format="json")
+            self.assertEqual(res.status_code, 200)
+            self.assertTrue(res.json()["answer"])
+
+    def test_fix_period_cancels_rejected_and_closes(self):
+        from . import periods
+        from .models import IssuedInvoice
+
+        self._reject()
+        owner = IssuedInvoice.objects.get().owner
+        period = IssuedInvoice.objects.get().issue_date.strftime("%Y-%m")
+        out = periods.fix_period(owner, period, "cancel_rejected", owner)
+        self.assertEqual(out["changed"], 1)
+        self.assertEqual(IssuedInvoice.objects.get().status, "cancelled")
+
+
 class AiAssistTests(HaciendaFlowTests):
     def test_review_draft_returns_exact_cost_and_ai_advice(self):
         from unittest import mock

@@ -1,9 +1,11 @@
 import re
 from decimal import Decimal
 
+from django.db.models import F
 from django.utils import timezone
 
-from .models import IssuedInvoice, PeriodClosure
+from . import hacienda
+from .models import IssuedInvoice, IssuedInvoiceStatusEvent, PeriodClosure
 
 PERIOD_RE = re.compile(r"^(\d{4})-(0[1-9]|1[0-2])$")
 S = IssuedInvoice.Status
@@ -62,16 +64,16 @@ def validate_period(owner, period):
 
     checks = []
 
-    def add(label, ok, detail, blocking=True):
-        checks.append({"label": label, "ok": ok, "detail": detail, "blocking": blocking})
+    def add(label, ok, detail, blocking=True, key=""):
+        checks.append({"label": label, "ok": ok, "detail": detail, "blocking": blocking, "key": key})
 
     add("El periodo tiene facturas", bool(active), "Sin facturas emitidas en el mes." if not active else f"{len(active)} facturas.")
     add("Sin borradores ni facturas por enviar", summary["pending_count"] == 0,
-        f"{summary['pending_count']} factura(s) aún no se envían a Hacienda." if summary["pending_count"] else "Todo fue enviado.")
+        f"{summary['pending_count']} factura(s) aún no se envían a Hacienda." if summary["pending_count"] else "Todo fue enviado.", key="pending")
     add("Sin facturas en proceso", summary["in_process_count"] == 0,
-        f"{summary['in_process_count']} factura(s) esperan respuesta de Hacienda." if summary["in_process_count"] else "Hacienda respondió todo.")
+        f"{summary['in_process_count']} factura(s) esperan respuesta de Hacienda." if summary["in_process_count"] else "Hacienda respondió todo.", key="process")
     add("Sin facturas rechazadas", summary["rejected_count"] == 0,
-        f"{summary['rejected_count']} rechazada(s): corrígelas y reénvíalas, o anúlalas." if summary["rejected_count"] else "Ninguna rechazada.")
+        f"{summary['rejected_count']} rechazada(s): corrígelas y reénvíalas, o anúlalas." if summary["rejected_count"] else "Ninguna rechazada.", key="rejected")
     bad = [i for i in active if i.subtotal + i.tax_total != i.total]
     add("Subtotal + IVA = total en cada factura", not bad, f"{len(bad)} factura(s) no cuadran." if bad else "Los importes cuadran.")
     claves = [i.clave for i in active if i.clave]
@@ -117,3 +119,46 @@ def reopen_period(owner, period, note=""):
         rejected_count=s["rejected_count"], total=s["total"], tax_total=s["tax_total"],
         note=note[:250],
     )
+
+
+FIX_ACTIONS = {
+    "cancel_rejected": "Anular las facturas rechazadas",
+    "reopen_rejected": "Devolver las rechazadas a borrador para editarlas",
+    "ready_drafts": "Marcar como listas los borradores válidos",
+}
+
+
+def fix_period(owner, period, action, actor=None):
+    """Acciones masivas para dejar un periodo en condiciones de cerrarse."""
+    if action not in FIX_ACTIONS:
+        raise ValueError("Acción desconocida.")
+    if is_closed(owner, period):
+        raise ValueError("El periodo está cerrado; reábrelo primero.")
+    year, month = parse_period(period)
+    queryset = IssuedInvoice.objects.filter(owner=owner, issue_date__year=year, issue_date__month=month)
+    changed, skipped = 0, []
+
+    def move(invoice, to, **extra):
+        IssuedInvoice.objects.filter(pk=invoice.pk, status=invoice.status).update(
+            status=to, version=F("version") + 1, updated_at=timezone.now(), **extra
+        )
+        IssuedInvoiceStatusEvent.objects.create(
+            invoice=invoice, from_status=invoice.status, to_status=to, actor=actor
+        )
+
+    if action in ("cancel_rejected", "reopen_rejected"):
+        for invoice in queryset.filter(status=S.REJECTED):
+            if action == "cancel_rejected":
+                move(invoice, S.CANCELLED)
+            else:
+                move(invoice, S.DRAFT, clave="", consecutive=None)
+            changed += 1
+    else:
+        for invoice in queryset.filter(status=S.DRAFT):
+            issues = hacienda.validate_invoice(invoice)
+            if issues:
+                skipped.append(f"{invoice.receiver_name}: {issues[0]['message']}")
+            else:
+                move(invoice, S.READY)
+                changed += 1
+    return {"changed": changed, "skipped": skipped}
