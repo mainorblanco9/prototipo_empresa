@@ -1,0 +1,65 @@
+{% extends 'validador/_shell.html' %}
+{% block title %}Panel{% endblock %}
+{% block heading %}Panel{% endblock %}
+{% block content %}
+<div class="row g-3"><div class="col-12 col-xxl-8">
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3"><div class="gb-card gb-stat"><div class="n text-success">{{ accepted }}</div><div class="l">Aceptadas por Hacienda</div></div></div>
+  <div class="col-6 col-md-3"><div class="gb-card gb-stat"><div class="n text-danger">{{ rejected }}</div><div class="l">Rechazadas</div></div></div>
+  <div class="col-6 col-md-3"><div class="gb-card gb-stat"><div class="n">{{ pending }}</div><div class="l">Por enviar</div></div></div>
+  <div class="col-6 col-md-3"><div class="gb-card gb-stat"><div class="n">{{ in_process }}</div><div class="l">En proceso</div></div></div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-12 col-lg-7">
+    <div class="gb-card h-100">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div>
+          <div class="text-secondary small fw-bold text-uppercase">Periodo {{ period }}</div>
+          <div class="fs-2 fw-bold">₡{{ month_total|floatformat:2 }}</div>
+          <div class="text-secondary small">Facturado y aceptado · IVA ₡{{ month_tax|floatformat:2 }} · {{ month_count }} facturas</div>
+        </div>
+        {% if report.already_closed %}<span class="gb-badge accepted">Cerrado</span>{% elif report.can_close %}<span class="gb-badge accepted">Listo para cierre</span>{% else %}<span class="gb-badge ready">Abierto</span>{% endif %}
+      </div>
+      {% if report.issues %}
+      <ul class="small text-secondary ps-3 mb-3">{% for i in report.issues %}<li>{{ i }}</li>{% endfor %}</ul>
+      {% endif %}
+      <a class="btn btn-primary" href="{% url 'closures' %}?period={{ period }}">Validar y cerrar el periodo</a>
+      <a class="btn btn-outline-primary" href="{% url 'invoice_wizard' %}">Nueva factura</a>
+    </div>
+  </div>
+  <div class="col-12 col-lg-5">
+    <div class="gb-card h-100">
+      <h2 class="h6 fw-bold">Requieren atención</h2>
+      {% for inv in rejected_invoices %}
+        <div class="gb-check"><span class="gb-dot bad">!</span><div><div class="fw-semibold">{{ inv.receiver_name }} · ₡{{ inv.total|floatformat:2 }}</div><div class="small text-secondary">{{ inv.hacienda_message|default:"Rechazada por Hacienda" }}</div></div></div>
+      {% empty %}<div class="text-secondary">Nada rechazado. 🎉</div>{% endfor %}
+      {% if rejected_invoices %}<a class="small" href="{% url 'issued_invoice_list' %}?status=rejected">Ver y corregir</a>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="gb-card mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2"><h2 class="h6 fw-bold m-0"><span class="gb-flag"></span> Facturación electrónica en Costa Rica</h2><a class="small" href="{% url 'hacienda_flow' %}">Ver flujo con Hacienda →</a></div>
+  <div class="gb-cr">
+    <div class="it"><b>FE · TE</b>Factura y tiquete electrónico</div>
+    <div class="it"><b>NC · ND</b>Notas de crédito y débito</div>
+    <div class="it"><b>FEE · FEC</b>Exportación y compra</div>
+    <div class="it"><b>IVA 13%</b>Tarifas 4%, 2% y 1% reducidas</div>
+    <div class="it"><b>v4.4</b>Esquema XML de comprobantes</div>
+    <div class="it"><b>Clave 50</b>Dígitos por comprobante</div>
+  </div>
+  <div class="small text-secondary mt-2">Cada factura se valida localmente y se envía a Hacienda (ATV). La firma XAdES y el CABYS real quedan para producción.</div>
+</div>
+</div><div class="col-12 col-xxl-4">
+<div class="gb-card gb-fill-xxl">
+  <div class="d-flex justify-content-between mb-2"><h2 class="h6 fw-bold m-0">Actividad reciente</h2><a class="small" href="{% url 'activity_log' %}">Ver bitácora</a></div>
+  <div class="gb-scroll"><table class="table gb-table gb-stack mb-0">
+    <thead><tr><th>Fecha</th><th>Receptor</th><th class="text-end">Total</th><th>Estado</th></tr></thead>
+    <tbody>{% for inv in recent %}
+      <tr><td class="gb-sub">{{ inv.issue_date|date:"d/m/Y" }}</td><td class="gb-grow">{{ inv.receiver_name }}</td><td class="text-end">₡{{ inv.total|floatformat:2 }}</td><td><span class="gb-badge {{ inv.status }}">{{ inv.get_status_display }}</span></td></tr>
+    {% empty %}<tr><td colspan="4" class="text-secondary">Aún no hay facturas. Crea la primera o importa un Excel.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</div>
+</div></div>
+{% endblock %}

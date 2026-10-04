@@ -7,17 +7,20 @@ from django.views.decorators.http import require_GET
 
 
 ICON_SVG = (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">'
-    '<rect width="512" height="512" rx="112" fill="#2359d1"/>'
-    '<path d="M150 150h212v212H150z" fill="none" stroke="#fff" '
-    'stroke-width="28" stroke-linejoin="round"/>'
-    '<path d="M196 256l44 44 80-88" fill="none" stroke="#00d1a4" '
-    'stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>'
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+    '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
+    '<stop offset="0" stop-color="#0b6bff"/><stop offset="1" stop-color="#00c2a8"/></linearGradient></defs>'
+    '<rect width="64" height="64" rx="17" fill="url(#g)"/>'
+    '<path d="M42.5 20.5A15 15 0 1 0 47 32H36" fill="none" stroke="#fff" '
+    'stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    '<path d="M25 32.5l5.2 5.2 9.3-10.2" fill="none" stroke="#bdfff0" '
+    'stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>'
     "</svg>"
 )
 
 SERVICE_WORKER_JS = """
-const CACHE = "analizadorpro-shell-v1";
+const CACHE = "guanabill-shell-v2";
+const CAPTURE_URL = "/facturas/movil/";
 const OFFLINE_URL = "/offline/";
 
 self.addEventListener("install", event => {
@@ -37,13 +40,24 @@ self.addEventListener("activate", event => {
   );
 });
 
-// Solo se guarda la pantalla sin conexión y el ícono. Las páginas con datos
-// de facturas nunca se almacenan en caché del navegador.
+// Solo se guardan la pantalla sin conexión, el ícono y el formulario de captura
+// móvil (sin datos de facturas; estas viven en IndexedDB del dispositivo).
+// Las demás páginas con datos nunca se almacenan en caché.
 self.addEventListener("fetch", event => {
   const request = event.request;
   if (request.method !== "GET" || request.mode !== "navigate") return;
+  const isCapture = new URL(request.url).pathname === CAPTURE_URL;
   event.respondWith(
-    fetch(request).catch(() => caches.match(OFFLINE_URL))
+    fetch(request)
+      .then(response => {
+        if (isCapture && response.ok && !response.redirected) {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put(CAPTURE_URL, copy));
+        }
+        return response;
+      })
+      .catch(() => Promise.resolve(isCapture ? caches.match(CAPTURE_URL) : null)
+        .then(cached => cached || caches.match(OFFLINE_URL)))
   );
 });
 """.strip()
@@ -52,18 +66,21 @@ self.addEventListener("fetch", event => {
 @require_GET
 def manifest(request):
     data = {
-        "name": "AnalizadorPro · Facturación local",
-        "short_name": "AnalizadorPro",
+        "name": "GuanaBill · Facturación electrónica",
+        "short_name": "GuanaBill",
         "description": (
-            "Prototipo local para preparar y dar seguimiento a facturas en "
-            "colones. No transmite documentos a Hacienda."
+            "Gestiona y envía facturas electrónicas a Hacienda: por API, Excel o factura a factura."
         ),
         "lang": "es-CR",
-        "start_url": "/facturas/",
+        "start_url": "/facturas/movil/",
         "scope": "/",
         "display": "standalone",
         "background_color": "#f2f6fb",
         "theme_color": "#2359d1",
+        "shortcuts": [
+            {"name": "Capturar factura", "url": "/facturas/movil/"},
+            {"name": "Facturas emitidas", "url": "/facturas/emitidas/"},
+        ],
         "icons": [
             {
                 "src": "/icon.svg",

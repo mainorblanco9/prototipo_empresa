@@ -1,4 +1,4 @@
-# Prototipo empresarial: análisis de tablas y gastos
+# GuanaBill: facturación electrónica para Hacienda
 
 Aplicación inicial en Django para analizar tablas CSV/TSV/XLSX con encabezados dinámicos, mostrar una vista previa, recomendar y generar un gráfico, y descargar un reporte. Conserva reglas adicionales para planillas de gastos y la carga condicional a SharePoint.
 
@@ -40,7 +40,7 @@ el procesador disponibles.
 
 Abre <http://127.0.0.1:8000/> e inicia sesión con el usuario mock `demo` y la contraseña `Demo123!`. La cuenta mock solo se habilita con `DJANGO_DEBUG=true` (valor local predeterminado) y no debe usarse en producción. Puedes cambiar el usuario y la contraseña de desarrollo con `DEMO_USERNAME` y `DEMO_PASSWORD`.
 
-Después del primer inicio de sesión, el prototipo presenta un selector de estilo (minimalista, abstracto o corporativo). Puedes describir el ambiente visual deseado y pedir una recomendación; la IA selecciona y aplica automáticamente uno de los temas permitidos. La preferencia se guarda por usuario y se puede cambiar luego con “Cambiar diseño”. No se envían datos de archivos a esa recomendación.
+Después del primer inicio de sesión, GuanaBill presenta un selector de estilo (minimalista, abstracto o corporativo). Puedes describir el ambiente visual deseado y pedir una recomendación; la IA selecciona y aplica automáticamente uno de los temas permitidos. La preferencia se guarda por usuario y se puede cambiar luego con “Cambiar diseño”. No se envían datos de archivos a esa recomendación.
 
 Ollama local es el proveedor predeterminado. Configura `OLLAMA_BASE_URL` para cambiar su dirección y `OLLAMA_MODEL` para seleccionar otro modelo ya descargado. Para usar OpenAI en lugar del modelo local, configura `AI_PROVIDER=openai` y `OPENAI_API_KEY` en el entorno. Sin un proveedor de IA disponible, la validación determinista y la selección manual de tema siguen funcionando.
 
@@ -57,7 +57,7 @@ source .venv/Scripts/activate
 - Ollama recomienda qué columnas comparar. La aplicación calcula los agregados y dibuja un gráfico de barras de forma local; si Ollama no responde, usa una selección de respaldo basada en los tipos detectados y muestra un aviso.
 - Reconoce flujos financieros con meses tanto en columnas como en filas. En archivos XLSX calcula localmente fórmulas aritméticas y sumas simples que no tengan resultados guardados por Excel. Si hay varias hojas anuales, puedes cambiar la hoja y el indicador del gráfico. La vista previa y la descarga corresponden a la hoja seleccionada automáticamente; los controles del gráfico responden al instante en el navegador, sin otra consulta a Ollama. Los meses mantienen su orden y los valores negativos se representan desde la línea de cero.
 - Muestra una vista previa de hasta 200 filas; el análisis permite hasta 20.000 filas y 100 columnas. El reporte CSV conserva todas las filas y el enlace vence en 10 minutos.
-- Prueba el flujo con [ejemplo_ventas.csv](./ejemplo_ventas.csv), que usa punto y coma como separador.
+- Prueba el flujo con [ejemplo_ventas.csv](./samples/ejemplo_ventas.csv), que usa punto y coma como separador.
 - En el análisis general y la validación de gastos, los valores de celdas se procesan localmente. Para las facturas con encabezados desconocidos, consulta la nota de privacidad del flujo de autodetección más abajo. El flujo costarricense verifica fecha, proveedor, factura duplicada, moneda CRC, importes no negativos y suma subtotal + impuesto.
 - La pantalla autenticada `/facturas/` y el endpoint `POST /api/invoices/parse/` detectan tablas de facturas en hojas y filas distintas de archivos XLSX/CSV/TSV, sin un tope fijo de columnas o filas en este flujo (el archivo está limitado a 10 MB), y convierten cada fila en un objeto JSON versionado. Si los encabezados no se reconocen, Ollama en `localhost` recibe todos los encabezados y una muestra de hasta 10 filas; la cantidad de filas de muestra se adapta al ancho de la tabla para mantener acotado el prompt, y cada valor se trunca a 100 caracteres. El resto del archivo se procesa en Django local. Este flujo no usa OpenAI ni envía datos fuera del computador; las tablas con encabezados reconocidos no requieren IA. Devuelve HTTP 200 cuando las facturas son válidas, HTTP 422 cuando requieren revisión y HTTP 503 si hace falta mapear encabezados pero Ollama no está disponible. Esta etapa solo prepara y valida datos; no transmite facturas a TribuCR.
 - En desarrollo local puedes ejecutar una simulación técnica local desde `/facturas/modelo/` o `POST /api/invoices/local-simulation/`. Solo se habilita con `DEBUG=true`, requiere sesión autenticada y no llama a Hacienda ni genera acuses o recibos fiscales. `/api/invoices/mock-submit/` se conserva como alias legado.
@@ -103,7 +103,7 @@ MXN, queda en revisión y no se incluye en el modelo listo ni en la simulación.
 El soporte para dólares queda para una etapa posterior. Incluye análisis
 mensual por factura en colones; el gráfico local solo incluye filas validadas.
 La segunda etapa se habilita únicamente para lotes válidos. Descarga
-[ejemplo_facturas_octubre.csv](./ejemplo_facturas_octubre.csv) para probar tres
+[ejemplo_facturas_octubre.csv](./samples/ejemplo_facturas_octubre.csv) para probar tres
 facturas ficticias en CRC. Sus datos y la validación son exclusivamente de
 demostración y no constituyen documentos ni certificación fiscal.
 
@@ -150,7 +150,7 @@ autenticada, token CSRF y un archivo en el campo `archivo`, igual que el endpoin
 de preparación. La ruta responde 404 cuando `DEBUG` está desactivado. La
 respuesta declara `real_hacienda_contacted: false` y `real_submission: false`.
 La simulación no contiene un cliente HTTP de remisión: ejecuta únicamente los
-controles internos de demostración.
+controles internos del lote.
 
 El flujo actual analiza facturas recibidas de proveedores como gastos; no es un
 sistema para emitir comprobantes a nombre del usuario. El esquema es una
@@ -159,7 +159,7 @@ costarricense. No incluye todavía emisor/receptor, líneas de detalle, códigos
 CABYS, actividad económica, firma digital ni estructura XML. La interfaz muestra
 un catálogo de trabajo de factura electrónica, tiquete electrónico, notas de
 crédito y débito, factura de compra y de exportación. Solo la primera tiene una
-demo genérica y ninguna está implementada o validada para envío fiscal. Cada
+disponible y ninguna está implementada o validada para envío fiscal. Cada
 tipo requiere su propio perfil de datos y reglas cotejados con documentación
 oficial vigente; no se simulan como tipos compatibles por solo cambiarles el
 nombre.
@@ -191,7 +191,7 @@ Ejemplo para una sesión ya iniciada con su token CSRF:
 
 ```bash
 curl -b cookies.txt -H "X-CSRFToken: $CSRF_TOKEN" \
-  -F "archivo=@ejemplo_gastos_validos.xlsx" \
+  -F "archivo=@samples/ejemplo_gastos_validos.xlsx" \
   http://127.0.0.1:8000/api/invoices/parse/
 ```
 
@@ -315,3 +315,104 @@ La identidad de aplicación permite que la aplicación cargue archivos sin inici
 El inicio de sesión local aún no está conectado al dominio. Para integrar AD, despliega primero en Linux/Docker con conectividad segura al controlador de dominio y configura `django-auth-ldap` sobre LDAPS, grupos y permisos mínimos. No expongas LDAP sin TLS ni guardes credenciales del directorio en el repositorio.
 
 Antes de producción: configura `DJANGO_SECRET_KEY`, desactiva `DJANGO_DEBUG`, integra un proveedor real de identidad (por ejemplo, Active Directory mediante LDAPS), agrega autorización por empresa, límites de carga, política de retención/borrado, auditoría y pruebas con datos ficticios. El login mock se desactiva con `DJANGO_DEBUG=false`. La caché de reportes de esta demo es local y efímera.
+
+## Flujo completo local: celular -> computadora -> Hacienda (simulada)
+
+1. **Celular**: abre `/facturas/movil/` (PWA instalable, también empaquetable como app
+   Android/iOS en `mobile/`). Captura la factura; se guarda en el dispositivo (IndexedDB) y se
+   sincroniza con Django al haber conexión (`client_id` evita duplicados).
+2. **Computadora**: abre `/facturas/emitidas/`, pulsa **Marcar lista** y **Enviar a Hacienda**.
+3. Django asigna consecutivo y **clave numérica de 50 dígitos** (506 + ddmmaa + cédula(12) +
+   consecutivo(20) + situación(1) + código seguridad(8)), genera el XML y llama al **gateway
+   Node.js** (`gateway/`), que usa el contrato de la API de recepción de Hacienda: token OAuth2,
+   `POST /recepcion` (202) y `GET /recepcion/{clave}` (`ind-estado`: recibido, procesando,
+   aceptado, rechazado). Django guarda el estado final (`queued -> processing -> accepted/rejected`).
+
+Arranque: `.\run_local.ps1` (o `-Lan` para usar el teléfono en la misma red con
+`DJANGO_ALLOWED_HOSTS=<IP>`). Pruebas: `python manage.py test` y `cd gateway; npm test`.
+
+### Alcance y límites (importante)
+- Hacienda se **simula** en `gateway/src/mock-hacienda.js` (`/mock/*`); para forzar un rechazo
+  incluye la palabra `RECHAZAR` en la descripción de una línea.
+- El XML sigue la estructura de la v4.4 pero **no está firmado (XAdES-EPES) ni usa CABYS reales**;
+  por eso `HACIENDA_MODE` distinto de `local` está bloqueado. Para producción hacen falta el
+  certificado .p12, firma, validación XSD, CABYS, actividad económica y el IDP real
+  (`api-sandbox.comprobanteselectronicos.go.cr`). Verifica siempre la documentación vigente.
+- Rutas del gateway: `GET /health`, `POST /auth/token`, `GET /invoices`,
+  `POST /invoices/<id>/submit`.
+- Apps nativas: ver `mobile/README.md`.
+## IA local (Ollama) en el flujo
+- **Captura móvil**: botón *Costo y revisión con IA* (`POST /api/v1/ai/review-draft/`). El costo
+  (subtotal + IVA = total) lo calcula Django; Ollama sugiere mejoras a descripciones, cantidades y
+  tarifas a confirmar.
+- **Respuesta de Hacienda**: tras *Enviar a Hacienda* se analiza el resultado (aceptada/rechazada)
+  con `POST /api/v1/invoices/<id>/ai-analysis/`; el texto se guarda en `ai_analysis`. Si Ollama no
+  responde, se muestra un análisis básico sin IA.
+- Solo se usa Ollama en `localhost` (`OLLAMA_MODEL`, por defecto `qwen2.5:3b`). La elección de
+  estilos y la corrección de tablas ya existentes siguen en `/diseno/` y `/facturas/`.
+
+## Desarrollo en VS Code
+Abre la carpeta del proyecto. `Ctrl+Shift+B`/*Run Task*: **Iniciar todo (Django + Gateway)**,
+**Pruebas Django**, **Pruebas gateway**, **Ollama: verificar modelo**. En *Run and Debug* usa el
+compuesto **Django + Gateway** para depurar ambos. Primera vez: `pip install -r requirements.txt`,
+`python manage.py migrate` y `ollama pull qwen2.5:3b`.
+
+## GuanaBill: tres vías de ingreso (entorno local)
+
+| Vía | Dónde |
+|---|---|
+| API REST de proveedores | `/integraciones/` (crear API keys, ejemplos curl/Python/Node). Usa `Authorization: Bearer gb_...` o `X-API-Key`. |
+| Excel / CSV | `/facturas/` |
+| Factura a factura | `/facturas/nueva/` (asistente paso a paso que llama a `POST /api/v1/invoices/`) |
+
+Datos de prueba locales: `python manage.py seed_guanabill` crea el usuario `proveedor_prueba`
+(`Proveedor123!`), una API key y 3 facturas de ejemplo. Solo funciona con `HACIENDA_MODE=local`.
+Las API keys se guardan hasheadas (SHA-256) y se muestran una sola vez.
+
+
+## Flujo de la aplicación
+
+- **Panel** (/panel/): resumen del periodo.
+- **Facturas** (/facturas/emitidas/): administración, envío, anulación y corrección.
+- **Nueva factura** (/facturas/nueva/) o **Importar Excel/CSV** (/facturas/importar/, plantilla incluida) o la API REST (/integraciones/).
+- **Cierres** (/cierres/): validador por periodo (AAAA-MM); bloquea si hay borradores, rechazadas, en cola o totales inconsistentes.
+- **Bitácora** (/bitacora/): facturas y cierres aceptados o rechazados, con exportación CSV.
+
+
+## Estructura del repositorio
+
+```
+config/      Proyecto Django (settings, urls)
+validador/   App principal: modelos, API REST (api.py), periodos (periods.py), importación, plantillas
+gateway/     Gateway Node.js + simulador de Hacienda (rutas ATV: /recepcion/v1/recepcion)
+mobile/      Envoltorio Capacitor (Android/iOS)
+samples/     Archivos de ejemplo (CSV/XLSX)
+scripts/     Utilidades (generar Excel de ejemplo)
+```
+
+Datos de prueba: `python manage.py seed_guanabill --user demo` y `python manage.py seed_bancos --user demo --send`.
+Pruebas: `python manage.py test` y `cd gateway; npm test`.
+
+## Contribuir
+
+Ramas de trabajo parten de `dev`; los PR se abren hacia `dev` y `main` se actualiza solo desde `dev`.
+Antes de abrir un PR ejecuta las dos suites de pruebas. Nunca subas `.env`, `db.sqlite3` ni certificados.
+
+## OpenAPI y datos de prueba
+
+- Documentacion interactiva: `/api/docs/` (Swagger UI, requiere internet); especificacion: `/api/v1/openapi.json`.
+- Excel de prueba: `samples/guanabill_facturas_validas.xlsx` y `samples/guanabill_facturas_todo_tipo.xlsx` (regenerar con `python scripts/generar_excel_facturas.py`).
+- `pip install -r requirements-dev.txt` para validar la especificacion en los tests.
+
+## Flujo flexible de rechazos y asistente IA
+
+- Una factura rechazada por Hacienda se puede **editar** (vuelve a borrador y se limpia la clave), **reenviar** o **anular**.
+- El cierre de periodo ofrece acciones r�pidas por cada punto bloqueante (marcar listas, devolver a borrador, anular rechazadas).
+- El bot�n **? Asistente** gu�a cada canal (manual, Excel, API REST, cierre) con la IA local; si Ollama no est� activo responde con una gu�a fija.
+- Endpoints: `POST /api/v1/invoices/<id>/ai-fix/` y `POST /api/v1/ai/assistant/`.
+
+## Preparaci�n para certificaci�n / preproducci�n
+
+El gateway reproduce el contrato p�blico de ATV: token OAuth2 (Keycloak `/auth/realms/<realm>/protocol/openid-connect/token`), `POST /recepcion/v1/recepcion` (202 + `Location`), `GET /recepcion/v1/recepcion/{clave}` con `ind-estado` (recibido, procesando, aceptado, rechazado) y `respuesta-xml` en base64 (MensajeHacienda 4.4). Para apuntar a preproducci�n solo se cambian `HACIENDA_BASE_URL` y `HACIENDA_TOKEN_URL`; el env�o real sigue bloqueado hasta contar con firma XAdES y CABYS oficial.
+
+En el cierre de periodo: *Preparar y enviar* marca listos los borradores v�lidos y los env�a; *Anular pendientes* descarta las que no se vayan a enviar.

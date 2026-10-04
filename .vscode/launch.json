@@ -1,0 +1,26 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Django (depurar)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/manage.py",
+      "args": ["runserver", "127.0.0.1:8000", "--noreload"],
+      "env": { "GATEWAY_URL": "http://127.0.0.1:3000" },
+      "django": true,
+      "justMyCode": true
+    },
+    {
+      "name": "Gateway Node (depurar)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/gateway/src/server.js",
+      "cwd": "${workspaceFolder}/gateway",
+      "env": { "DJANGO_URL": "http://127.0.0.1:8000", "PORT": "3000" }
+    }
+  ],
+  "compounds": [
+    { "name": "Django + Gateway", "configurations": ["Django (depurar)", "Gateway Node (depurar)"], "stopAll": true }
+  ]
+}

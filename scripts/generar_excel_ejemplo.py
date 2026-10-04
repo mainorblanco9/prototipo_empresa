@@ -50,5 +50,5 @@ def write_workbook(filename, rows):
     print(f"Archivo creado: {filename}")
 
 
-write_workbook("ejemplo_gastos.xlsx", rows_with_errors)
-write_workbook("ejemplo_gastos_validos.xlsx", valid_rows)
+write_workbook("samples/ejemplo_gastos.xlsx", rows_with_errors)
+write_workbook("samples/ejemplo_gastos_validos.xlsx", valid_rows)

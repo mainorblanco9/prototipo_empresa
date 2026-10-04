@@ -1,0 +1,63 @@
+{% extends 'validador/_shell.html' %}
+{% block title %}Cierre de periodo{% endblock %}
+{% block heading %}Cierre de periodo{% endblock %}
+{% block content %}
+{% if message %}<div class="alert alert-{{ message.0 }}">{{ message.1 }}</div>{% endif %}
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="gb-card">
+      <form method="get" class="d-flex gap-2 align-items-end mb-3">
+        <div><label class="form-label small fw-bold">Periodo (mes)</label><input class="form-control" type="month" name="period" value="{{ period }}"></div>
+        <button class="btn btn-outline-primary" type="submit">Validar</button>
+      </form>
+      <h2 class="h6 fw-bold">Validación del periodo {{ period }}</h2>
+      {% for c in report.checks %}
+        <div class="gb-check">
+          <span class="gb-dot {% if c.ok %}ok{% elif c.blocking %}bad{% else %}warn{% endif %}">{% if c.ok %}✓{% else %}!{% endif %}</span>
+          <div><div class="fw-semibold">{{ c.label }}{% if not c.blocking %} <span class="small text-secondary fw-normal">(aviso)</span>{% endif %}</div><div class="small text-secondary">{{ c.detail }}</div>
+          {% if not c.ok and not report.already_closed %}<form method="post" class="d-flex flex-wrap gap-1 mt-2">{% csrf_token %}<input type="hidden" name="period" value="{{ period }}"><input type="hidden" name="action" value="fix">
+            {% if c.key == "pending" %}<button class="btn btn-sm btn-outline-primary" name="fix" value="ready_drafts" type="submit">Marcar listos los borradores válidos</button><button class="btn btn-sm btn-primary" name="fix" value="send_all" type="submit" data-confirm-title="¿Preparar y enviar?" data-confirm="Los borradores válidos de {{ period }} se marcarán listos y se enviarán a Hacienda junto con las que ya estaban listas." data-confirm-ok="Enviar" data-confirm-icon="📤">Preparar y enviar a Hacienda</button><button class="btn btn-sm btn-outline-danger" name="fix" value="cancel_pending" type="submit" data-confirm-title="¿Anular las pendientes?" data-confirm="Las facturas en borrador, listas o en cola de {{ period }} quedarán anuladas y no se enviarán." data-confirm-ok="Anular" data-confirm-danger="1">Anular pendientes</button>{% endif %}
+            {% if c.key == "rejected" %}<button class="btn btn-sm btn-outline-primary" name="fix" value="reopen_rejected" type="submit" data-confirm-title="¿Devolver a borrador?" data-confirm="Las facturas rechazadas del mes volverán a borrador para editarlas y reenviarlas." data-confirm-ok="Devolver a borrador" data-confirm-icon="✏️">Devolver a borrador</button><button class="btn btn-sm btn-outline-danger" name="fix" value="cancel_rejected" type="submit" data-confirm-title="¿Anular las rechazadas?" data-confirm="Todas las facturas rechazadas de {{ period }} quedarán anuladas y no se enviarán." data-confirm-ok="Anular" data-confirm-danger="1">Anular rechazadas</button><a class="btn btn-sm btn-primary" href="{% url 'issued_invoice_list' %}?period={{ period }}&status=rejected">Corregir una por una</a>{% endif %}
+            {% if c.key == "process" %}<button class="btn btn-sm btn-primary" name="fix" value="send_pending" type="submit">Enviar / reintentar en Hacienda</button><button class="btn btn-sm btn-outline-danger" name="fix" value="cancel_pending" type="submit" data-confirm-title="¿Anular las pendientes?" data-confirm="Las facturas en borrador, listas o en cola de {{ period }} quedarán anuladas y no se enviarán." data-confirm-ok="Anular" data-confirm-danger="1">Anular pendientes</button><a class="btn btn-sm btn-outline-primary" href="{% url 'issued_invoice_list' %}?period={{ period }}">Consultar estado</a>{% endif %}
+          </form>{% endif %}</div>
+        </div>
+      {% endfor %}
+      <form method="post" class="mt-3 d-flex gap-2 flex-wrap">
+        {% csrf_token %}<input type="hidden" name="period" value="{{ period }}">
+        {% if report.already_closed %}
+          <input class="form-control" name="note" placeholder="Motivo de la reapertura" maxlength="250" style="max-width:320px">
+          <button class="btn btn-outline-primary" name="action" value="reopen" type="submit" data-confirm-title="¿Reabrir el periodo?" data-confirm="Se permitirá modificar facturas de este mes y quedará registrado en la bitácora." data-confirm-ok="Reabrir" data-confirm-icon="🔓">Reabrir periodo</button>
+        {% else %}
+          <button class="btn btn-primary" name="action" value="close" type="submit" data-confirm-title="¿Cerrar el periodo?" data-confirm="Se validará el mes y, si pasa, no se podrán crear ni editar facturas en él. El intento queda en la bitácora." data-confirm-ok="Cerrar periodo" data-confirm-icon="🔒">{% if report.can_close %}Cerrar periodo{% else %}Intentar cierre (quedará en la bitácora){% endif %}</button>
+          <a class="btn btn-outline-primary" href="{% url 'issued_invoice_list' %}?period={{ period }}">Ver facturas del mes</a>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="gb-card mb-3">
+      <h2 class="h6 fw-bold">✨ Asistente de cierre</h2>
+      <p class="small text-secondary mb-2">La IA local revisa tu periodo y te dice qué hacer, paso a paso.</p>
+      <button type="button" class="btn btn-primary btn-sm" id="close-ai" data-gb-ask="cierre" data-gb-period="{{ period }}" data-gb-q="¿Qué debo hacer para cerrar este periodo?">✨ ¿Qué me falta para cerrar?</button>
+    </div>
+    <div class="gb-card mb-3">
+      <h2 class="h6 fw-bold">Resumen {{ period }}</h2>
+      <div class="d-flex justify-content-between"><span>Facturas</span><strong>{{ report.summary.invoice_count }}</strong></div>
+      <div class="d-flex justify-content-between"><span>Aceptadas</span><strong class="text-success">{{ report.summary.accepted_count }}</strong></div>
+      <div class="d-flex justify-content-between"><span>Rechazadas</span><strong class="text-danger">{{ report.summary.rejected_count }}</strong></div>
+      <div class="d-flex justify-content-between"><span>Por enviar / en proceso</span><strong>{{ report.summary.pending_count }} / {{ report.summary.in_process_count }}</strong></div>
+      <hr>
+      <div class="d-flex justify-content-between"><span>Total aceptado</span><strong>₡{{ report.summary.total|floatformat:2 }}</strong></div>
+      <div class="d-flex justify-content-between"><span>IVA</span><strong>₡{{ report.summary.tax_total|floatformat:2 }}</strong></div>
+    </div>
+    <div class="gb-card">
+      <h2 class="h6 fw-bold">Cierres recientes</h2>
+      {% for e in history %}
+        <div class="gb-check"><span class="gb-dot {% if e.result == 'closed' %}ok{% elif e.result == 'blocked' %}bad{% else %}warn{% endif %}">{% if e.result == 'closed' %}✓{% elif e.result == 'blocked' %}✕{% else %}↺{% endif %}</span>
+          <div><div class="fw-semibold">{{ e.period }} · {{ e.get_result_display }}</div><div class="small text-secondary">{{ e.created_at|date:"d/m/Y H:i" }}</div></div></div>
+      {% empty %}<div class="text-secondary small">Aún no hay cierres.</div>{% endfor %}
+      <a class="small" href="{% url 'activity_log' %}?tipo=cierres">Ver en la bitácora</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

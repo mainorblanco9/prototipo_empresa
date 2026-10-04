@@ -1,8 +1,10 @@
-from django.urls import path
+﻿from django.urls import path
 
-from . import api, pwa, views
+from . import api, app_views, invoice_import, openapi, pwa, views
 
 urlpatterns = [
+    path("api/v1/openapi.json", openapi.openapi_json, name="api_openapi"),
+    path("api/docs/", openapi.api_docs, name="api_docs"),
     path("api/v1/", api.ApiRootView.as_view(), name="api_root"),
     path("api/v1/auth/token/", api.TokenView.as_view(), name="api_token"),
     path(
@@ -30,6 +32,53 @@ urlpatterns = [
         api.IssuedInvoiceViewSet.as_view({"get": "history"}),
         name="api_invoice_history",
     ),
+    path(
+        "api/v1/invoices/<uuid:pk>/validate/",
+        api.IssuedInvoiceViewSet.as_view({"post": "validate"}),
+        name="api_invoice_validate",
+    ),
+    path(
+        "api/v1/invoices/<uuid:pk>/queue/",
+        api.IssuedInvoiceViewSet.as_view({"post": "queue"}),
+        name="api_invoice_queue",
+    ),
+    path(
+        "api/v1/invoices/<uuid:pk>/reception-payload/",
+        api.IssuedInvoiceViewSet.as_view({"get": "reception_payload"}),
+        name="api_invoice_reception_payload",
+    ),
+    path(
+        "api/v1/invoices/<uuid:pk>/hacienda-result/",
+        api.IssuedInvoiceViewSet.as_view({"post": "hacienda_result"}),
+        name="api_invoice_hacienda_result",
+    ),
+    path(
+        "api/v1/invoices/<uuid:pk>/submit/",
+        api.IssuedInvoiceViewSet.as_view({"post": "submit"}),
+        name="api_invoice_submit",
+    ),
+    path(
+        "api/v1/invoices/<uuid:pk>/ai-analysis/",
+        api.IssuedInvoiceViewSet.as_view({"post": "ai_analysis"}),
+        name="api_invoice_ai_analysis",
+    ),
+    path(
+        "api/v1/invoices/<uuid:pk>/ai-fix/",
+        api.IssuedInvoiceViewSet.as_view({"post": "ai_fix"}),
+        name="api_invoice_ai_fix",
+    ),
+    path("api/v1/ai/assistant/", api.AssistantView.as_view(), name="api_ai_assistant"),
+    path("api/v1/ai/review-draft/", api.DraftReviewView.as_view(), name="api_ai_review_draft"),
+    path("facturas/nueva/", views.invoice_wizard, name="invoice_wizard"),
+    path("integraciones/", views.integrations, name="integrations"),
+    path("api/v1/invoices/import/", invoice_import.InvoiceImportView.as_view(), name="api_invoice_import"),
+    path("api/v1/design/theme/", app_views.theme_api, name="api_design_theme"),
+    path("flujo-hacienda/", app_views.hacienda_flow, name="hacienda_flow"),
+    path("panel/", app_views.dashboard, name="dashboard"),
+    path("cierres/", app_views.closures, name="closures"),
+    path("bitacora/", app_views.activity_log, name="activity_log"),
+    path("facturas/importar/", app_views.import_invoices, name="import_invoices"),
+    path("facturas/importar/plantilla.csv", app_views.import_template, name="import_template"),
     path("manifest.webmanifest", pwa.manifest, name="pwa_manifest"),
     path("sw.js", pwa.service_worker, name="pwa_service_worker"),
     path("icon.svg", pwa.icon, name="pwa_icon"),
@@ -63,6 +112,8 @@ urlpatterns = [
         views.download_invoice_model,
         name="download_invoice_model",
     ),
+    path("facturas/movil/", views.mobile_capture, name="mobile_capture"),
+    path("facturas/emitidas/", views.issued_invoice_list, name="issued_invoice_list"),
     path("facturas/bitacora/", views.invoice_audit, name="invoice_audit"),
     path("api/invoices/parse/", views.parse_invoice_documents, name="parse_invoice_documents"),
     path(

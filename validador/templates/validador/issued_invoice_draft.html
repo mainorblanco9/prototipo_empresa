@@ -1,19 +1,7 @@
-<!doctype html>
-<html lang="es">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#f5f7fb">
-    {% include 'validador/_pwa_head.html' %}
-    <title>Borrador de factura emitida | AnalizadorPro</title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
-      crossorigin="anonymous">
-    <style>
-      :root { --ink: #10233f; --brand: #2359d1; --line: #dfe7f1; --muted: #64748b; }
-      body { min-height: 100vh; background: radial-gradient(ellipse at 85% 0, #e5edff 0, transparent 32rem), #f2f6fb; color: var(--ink); }
+{% extends "validador/_shell.html" %}
+{% block title %}Borrador de factura emitida{% endblock %}
+{% block head %}
+<style>
       .page-shell { max-width: 1180px; }
       .app-layout { display: grid; grid-template-columns: 238px minmax(0, 1fr); gap: 1.35rem; align-items: start; }
       .app-sidebar,.surface-card { border: 1px solid rgba(218,228,241,.95); border-radius: 1rem; background: rgba(255,255,255,.96); box-shadow: 0 14px 36px rgba(23,47,82,.07); }
@@ -23,7 +11,6 @@
       .side-link:hover,.side-link.active { border-color: #d9e5fb; background: #edf3ff; color: var(--brand); }
       .side-icon,.brand-mark { display: inline-grid; width: 2rem; height: 2rem; place-items: center; border-radius: .65rem; background: #eaf0ff; color: var(--brand); font-weight: 800; }
       .sidebar-note { margin-top: 1rem; padding: .8rem; border: 1px solid #e4ebf5; border-radius: .75rem; background: #f8faff; color: var(--muted); font-size: .75rem; line-height: 1.5; }
-      .app-navbar { background: rgba(255,255,255,.92); border-bottom: 1px solid var(--line); }
       .hero-panel { border-radius: 1.25rem; padding: clamp(1.5rem,4vw,2.5rem); color: #fff; background: linear-gradient(120deg,#10233f 0%,#173a70 62%,#2458a3 100%); }
       .hero-panel .eyebrow { color: #9bc4ff; font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
       .hero-panel p { color: #d4e1f4; }
@@ -42,20 +29,9 @@
       }
       @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
     </style>
-  </head>
-  <body>
-    <nav class="navbar app-navbar">
-      <div class="container page-shell d-flex justify-content-between align-items-center">
-        <a class="navbar-brand d-flex align-items-center gap-2 fw-semibold mb-0" href="{% url 'invoice_workspace' %}">
-          <span class="brand-mark">V</span><span>Analizador<span class="text-primary">Pro</span></span>
-        </a>
-        <div class="d-flex align-items-center gap-3">
-          <span class="small text-secondary">{{ request.user.username }}</span>
-          <a class="btn btn-sm btn-outline-secondary" href="{% url 'invoice_workspace' %}">Análisis de gastos</a>
-        </div>
-      </div>
-    </nav>
-    <div class="container page-shell app-layout py-4 py-lg-5">
+{% endblock %}
+{% block content %}
+<div class="container page-shell app-layout py-4 py-lg-5">
       <aside class="app-sidebar" aria-label="Navegación del flujo de facturas">
         <p class="sidebar-label">Flujos independientes</p>
         <a class="side-link" href="{% url 'invoice_workspace' %}"><span class="side-icon">01</span><span>Analizar gastos recibidos</span></a>
@@ -81,7 +57,7 @@
 
         <section class="surface-card p-3 p-md-4 mb-4" aria-labelledby="issued-form-title">
           <h2 id="issued-form-title" class="h4 fw-bold">Datos para el borrador</h2>
-          <p class="small text-secondary">Los campos de identificación se guardan como texto y no se validan contra formatos oficiales. Ingresa el precio final con IVA incluido y selecciona la tarifa por línea; el prototipo separará automáticamente la base y el impuesto. Confirma la tarifa aplicable según cada bien o servicio.</p>
+          <p class="small text-secondary">Los campos de identificación se guardan como texto y no se validan contra formatos oficiales. Ingresa el precio final con IVA incluido y selecciona la tarifa por línea; GuanaBill separará automáticamente la base y el impuesto. Confirma la tarifa aplicable según cada bien o servicio.</p>
           <form method="post">
             {% csrf_token %}
             <input type="hidden" name="action" value="prepare">
@@ -210,7 +186,9 @@
         <td><button class="btn btn-sm btn-outline-danger remove-line" type="button" aria-label="Eliminar línea">×</button></td>
       </tr>
     </template>
-    <script>
+{% endblock %}
+{% block scripts %}
+<script>
       (() => {
         const lines = document.getElementById("invoice-lines");
         const money = new Intl.NumberFormat("es-CR", {
@@ -257,5 +235,4 @@
         recalculate();
       })();
     </script>
-  </body>
-</html>
+{% endblock %}

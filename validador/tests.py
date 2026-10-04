@@ -657,13 +657,14 @@ class ExpenseValidationTests(TestCase):
         self.assertEqual(manifest.status_code, 200)
         data = json.loads(manifest.content)
         self.assertEqual(data["display"], "standalone")
-        self.assertEqual(data["start_url"], "/facturas/")
+        self.assertEqual(data["start_url"], "/facturas/movil/")
 
         worker = self.client.get(reverse("pwa_service_worker"))
         self.assertEqual(worker.status_code, 200)
         self.assertEqual(worker["Service-Worker-Allowed"], "/")
         self.assertIn("no-cache", worker["Cache-Control"])
-        self.assertNotIn(b"/facturas/", worker.content)
+        self.assertNotIn(b"/facturas/emitidas", worker.content)
+        self.assertNotIn(b"/api/", worker.content)
 
         self.assertEqual(self.client.get(reverse("pwa_icon")).status_code, 200)
         self.assertEqual(self.client.get(reverse("pwa_offline")).status_code, 200)
@@ -1560,7 +1561,7 @@ class ExpenseValidationTests(TestCase):
         self.assertContains(response, "Factura electrónica")
         self.assertContains(response, "Tiquete electrónico")
         self.assertContains(response, "Nota de crédito electrónica")
-        self.assertContains(response, "no se transmite a TRIBU-CR/Hacienda")
+        self.assertContains(response, "resumen interno para revisión")
         self.assertContains(response, 'style="width: 100.0%"')
 
         downloaded = self.client.get(reverse("download_invoice_model"))
@@ -2020,7 +2021,7 @@ class MockLoginTests(TestCase):
     def test_login_page_shows_demo_username(self):
         response = self.client.get(reverse("login"))
         self.assertContains(response, "demo")
-        self.assertContains(response, "No usar en producción")
+        self.assertContains(response, "En producción se desactiva")
 
     def test_valid_mock_credentials_create_session(self):
         response = self.client.post(
@@ -2075,7 +2076,7 @@ class DesignPreferenceTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse("index"),
+            reverse("dashboard"),
             fetch_redirect_response=False,
         )
         preference = UserDesignPreference.objects.get(user__username="demo")
@@ -2110,7 +2111,7 @@ class DesignPreferenceTests(TestCase):
         recommend_design.assert_called_once_with("Formal y sobrio para finanzas")
         self.assertRedirects(
             response,
-            reverse("index"),
+            reverse("dashboard"),
             fetch_redirect_response=False,
         )
         preference = UserDesignPreference.objects.get(user__username="demo")
