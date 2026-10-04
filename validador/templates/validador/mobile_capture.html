@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="es" data-theme="{{ gb_theme }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#2359d1">
+    {% include 'validador/_pwa_head.html' %}
+    <title>Captura móvil | GuanaBill</title>
+    <style>
+      :root { --ink:#10233f; --brand:#2359d1; --line:#dfe7f1; --muted:#64748b; }
+      * { box-sizing: border-box; }
+      body { margin:0; padding:0 0 env(safe-area-inset-bottom); background:#f2f6fb; color:var(--ink); font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+      header { position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; align-items:center; gap:.5rem; padding:.8rem 1rem; padding-top:calc(.8rem + env(safe-area-inset-top)); background:var(--brand); color:#fff; }
+      header h1 { margin:0; font-size:1.05rem; }
+      .pill { padding:.2rem .6rem; border-radius:99px; background:#ffffff33; font-size:.8rem; }
+      main { max-width:720px; margin:0 auto; padding:1rem; }
+      .card { margin-bottom:1rem; padding:1rem; border:1px solid var(--line); border-radius:1rem; background:#fff; }
+      h2 { margin:.1rem 0 .7rem; font-size:1.05rem; }
+      label { display:block; margin:.6rem 0 .2rem; font-size:.85rem; font-weight:650; }
+      input, select { width:100%; min-height:46px; padding:.55rem .7rem; border:1px solid #cdd8e6; border-radius:.7rem; background:#fff; font:inherit; }
+      .grid { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; }
+      .line { margin-top:.8rem; padding:.7rem; border:1px dashed #c3d1e6; border-radius:.8rem; }
+      button { min-height:48px; padding:.6rem 1rem; border:0; border-radius:.8rem; background:var(--brand); color:#fff; font:inherit; font-weight:700; }
+      button.secondary { background:#eaf0ff; color:var(--brand); }
+      button.danger { background:#fdecec; color:#b42318; min-height:40px; }
+      .actions { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:1rem; }
+      .actions button { flex:1 1 9rem; }
+      .total { margin-top:.8rem; font-weight:800; font-size:1.1rem; }
+      .item { display:flex; justify-content:space-between; gap:.6rem; padding:.6rem 0; border-top:1px solid var(--line); font-size:.92rem; }
+      .badge { align-self:flex-start; padding:.1rem .55rem; border-radius:99px; font-size:.75rem; font-weight:700; white-space:nowrap; }
+      .pending { background:#fff4d6; color:#8a5a00; } .synced { background:#dcf7e8; color:#0b6b3a; } .error { background:#fdecec; color:#b42318; }
+      .msg { margin:.6rem 0 0; font-size:.88rem; color:var(--muted); }
+      nav.links { display:flex; gap:1rem; margin-top:.5rem; font-size:.9rem; }
+      a { color:var(--brand); }
+    </style>
+    {% include 'validador/_theme.html' %}
+  </head>
+  <body>
+    {% csrf_token %}
+    <header>
+      <h1>Capturar factura</h1>
+      <span class="pill" id="net">…</span>
+    </header>
+    <main>
+      <section class="card">
+        <h2>Nueva factura (borrador)</h2>
+        <form id="form" autocomplete="off">
+          <label for="issuer_name">Emisor · nombre</label>
+          <input id="issuer_name" required maxlength="250">
+          <label for="issuer_id">Emisor · identificación</label>
+          <input id="issuer_id" required maxlength="100" inputmode="numeric">
+          <label for="receiver_name">Receptor · nombre</label>
+          <input id="receiver_name" required maxlength="250">
+          <label for="receiver_id">Receptor · identificación</label>
+          <input id="receiver_id" required maxlength="100" inputmode="numeric">
+          <label for="issue_date">Fecha</label>
+          <input id="issue_date" type="date" required>
+          <div id="lines"></div>
+          <div class="actions"><button type="button" class="secondary" id="add-line">+ Agregar línea</button></div>
+          <div class="total" id="total">Total: ₡0.00</div>
+          <div class="actions"><button type="button" class="secondary" id="ai-review">✨ Costo y revisión con IA</button><button type="submit">Guardar factura</button></div>
+          <div class="card" id="ai-box" hidden><strong>Asistente IA (Ollama local)</strong><div id="ai-cost"></div><pre id="ai-advice" style="white-space:pre-wrap;font:inherit;margin:.5rem 0 0"></pre></div>
+          <p class="msg" id="msg" role="status"></p>
+        </form>
+      </section>
+      <section class="card">
+        <h2>Guardadas en este dispositivo</h2>
+        <div class="actions"><button type="button" class="secondary" id="sync">Sincronizar ahora</button></div>
+        <div id="list"></div>
+        <p class="msg">Las facturas se guardan aunque no haya internet y se envían al servidor al reconectar. El envío a Hacienda se hace desde la computadora.</p>
+      </section>
+      <nav class="links">
+        <a href="{% url 'issued_invoice_list' %}">Ver facturas del servidor</a>
+        <a href="{% url 'invoice_workspace' %}">Inicio</a>
+      </nav>
+    </main>
+    <script>
+    (() => {
+      const $ = id => document.getElementById(id);
+      const RATES = [["13","13 %"],["4","4 %"],["2","2 %"],["1","1 %"],["0","0 %"],["exempt","Exento"]];
+      const DB_NAME = "guanabill-mobile", STORE = "invoices";
+
+      const openDb = () => new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: "client_id" });
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      const tx = async (mode, fn) => {
+        const db = await openDb();
+        return new Promise((resolve, reject) => {
+          const t = db.transaction(STORE, mode);
+          const result = fn(t.objectStore(STORE));
+          t.oncomplete = () => resolve(result.result);
+          t.onerror = () => reject(t.error);
+        });
+      };
+      const putItem = item => tx("readwrite", s => s.put(item));
+      const delItem = id => tx("readwrite", s => s.delete(id));
+      const allItems = () => tx("readonly", s => s.getAll());
+
+      const csrf = () => (document.cookie.match(/csrftoken=([^;]+)/) || [])[1]
+        || document.querySelector("[name=csrfmiddlewaretoken]").value;
+      const uuid = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+        const r = crypto.getRandomValues(new Uint8Array(1))[0] & 15;
+        return (c === "x" ? r : (r & 3) | 8).toString(16);
+      });
+      const money = n => "₡" + n.toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      function addLine(values = {}) {
+        const div = document.createElement("div");
+        div.className = "line";
+        div.innerHTML = `
+          <label>Descripción</label><input class="d" required maxlength="250">
+          <div class="grid">
+            <div><label>Cantidad</label><input class="q" type="number" min="0.001" step="0.001" value="1" required inputmode="decimal"></div>
+            <div><label>Precio con IVA</label><input class="p" type="number" min="0" step="0.01" required inputmode="decimal"></div>
+          </div>
+          <label>Tarifa IVA</label>
+          <select class="r">${RATES.map(([v,l]) => `<option value="${v}">${l}</option>`).join("")}</select>
+          <div class="actions"><button type="button" class="danger rm">Quitar línea</button></div>`;
+        div.querySelector(".d").value = values.description || "";
+        if (values.quantity) div.querySelector(".q").value = values.quantity;
+        if (values.unit_price) div.querySelector(".p").value = values.unit_price;
+        div.querySelector(".r").value = values.tax_rate || "13";
+        div.querySelector(".rm").onclick = () => { if ($("lines").children.length > 1) { div.remove(); recalc(); } };
+        div.oninput = recalc;
+        $("lines").appendChild(div);
+      }
+      const readLines = () => [...$("lines").children].map(l => ({
+        description: l.querySelector(".d").value.trim(),
+        quantity: l.querySelector(".q").value,
+        unit_price: l.querySelector(".p").value,
+        tax_rate: l.querySelector(".r").value,
+      }));
+      function recalc() {
+        const total = readLines().reduce((sum, l) => sum + (parseFloat(l.quantity) || 0) * (parseFloat(l.unit_price) || 0), 0);
+        $("total").textContent = "Total: " + money(total);
+      }
+
+      const FIELDS = ["issuer_name","issuer_id","receiver_name","receiver_id","issue_date"];
+      function loadDefaults() {
+        $("issue_date").value = new Date().toLocaleDateString("sv-SE");
+        $("issuer_name").value = localStorage.getItem("issuer_name") || "";
+        $("issuer_id").value = localStorage.getItem("issuer_id") || "";
+      }
+
+      async function render() {
+        const items = (await allItems()).sort((a, b) => b.saved_at - a.saved_at);
+        $("list").innerHTML = items.map(i => `
+          <div class="item"><div><strong></strong><br><small>${i.issue_date}</small>${i.error ? `<br><small class="err"></small>` : ""}</div>
+          <span class="badge ${i.state}">${{pending:"Pendiente", synced:"Sincronizada", error:"Error"}[i.state]}</span></div>`).join("")
+          || '<p class="msg">Sin facturas guardadas.</p>';
+        [...$("list").querySelectorAll(".item")].forEach((el, n) => {
+          el.querySelector("strong").textContent = items[n].receiver_name;
+          const err = el.querySelector(".err"); if (err) err.textContent = items[n].error;
+        });
+      }
+
+      let syncing = false;
+      async function sync() {
+        if (syncing || !navigator.onLine) return;
+        syncing = true;
+        try {
+          for (const item of (await allItems()).filter(i => i.state !== "synced")) {
+            const { state, saved_at, error, ...body } = item;
+            try {
+              const res = await fetch("/api/v1/invoices/", {
+                method: "POST", credentials: "same-origin",
+                headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+                body: JSON.stringify(body),
+              });
+              if (res.ok) { item.state = "synced"; item.error = ""; }
+              else if (res.status === 401 || res.status === 403) {
+                $("msg").textContent = "Sesión vencida: inicia sesión de nuevo para sincronizar.";
+                break;
+              } else {
+                const data = await res.json().catch(() => ({}));
+                item.state = "error";
+                item.error = typeof data.detail === "string" ? data.detail : JSON.stringify(data);
+              }
+              await putItem(item);
+            } catch { break; }
+          }
+        } finally { syncing = false; await render(); }
+      }
+
+      $("form").addEventListener("submit", async event => {
+        event.preventDefault();
+        const item = {
+          client_id: uuid(),
+          lines: readLines(),
+          state: "pending", error: "", saved_at: Date.now(),
+        };
+        FIELDS.forEach(f => item[f] = $(f).value.trim());
+        localStorage.setItem("issuer_name", item.issuer_name);
+        localStorage.setItem("issuer_id", item.issuer_id);
+        await putItem(item);
+        $("receiver_name").value = ""; $("receiver_id").value = "";
+        $("lines").innerHTML = ""; addLine(); recalc();
+        $("msg").textContent = "Guardada en el dispositivo.";
+        await render();
+        sync();
+      });
+
+      const setNet = () => { $("net").textContent = navigator.onLine ? "En línea" : "Sin conexión"; };
+      window.addEventListener("online", () => { setNet(); sync(); });
+      window.addEventListener("offline", setNet);
+      $("ai-review").onclick = async () => {
+        if (!navigator.onLine) { $("msg").textContent = "La IA requiere conexión con el servidor."; return; }
+        const body = { lines: readLines() };
+        FIELDS.forEach(f => body[f] = $(f).value.trim());
+        $("ai-box").hidden = false; $("ai-cost").textContent = ""; $("ai-advice").textContent = "Analizando…";
+        try {
+          const res = await fetch("/api/v1/ai/review-draft/", { method: "POST", credentials: "same-origin",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() }, body: JSON.stringify(body) });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || Object.values(data).flat().join(" "));
+          const c = data.cost;
+          $("ai-cost").textContent = `Subtotal ${money(+c.subtotal)} + IVA ${money(+c.tax)} = Total a pagar ${money(+c.total)}`;
+          $("ai-advice").textContent = data.ai_available ? data.advice : "IA no disponible: " + data.error;
+        } catch (e) { $("ai-advice").textContent = e.message; }
+      };
+      $("add-line").onclick = () => addLine();
+      $("sync").onclick = sync;
+      loadDefaults(); addLine(); setNet(); render(); sync();
+    })();
+    </script>
+  </body>
+</html>

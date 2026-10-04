@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="es" data-theme="{{ gb_theme }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#003087">
+  {% include 'validador/_pwa_head.html' %}
+  <title>{% block title %}GuanaBill{% endblock %} | GuanaBill</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  {% include 'validador/_theme.html' %}
+  <style>
+    .gb-shell { display:grid; grid-template-columns: 220px minmax(0,1fr); min-height:100vh; min-height:100dvh; }
+    .gb-side { background:var(--surface); border-right:1px solid var(--line); padding:1.25rem 1rem; position:sticky; top:0; height:100vh; height:100dvh; overflow-y:auto; overscroll-behavior:contain; z-index:60; display:flex; flex-direction:column; gap:.25rem; }
+    .gb-logo { display:flex; align-items:center; gap:.5rem; font-weight:800; font-size:1.25rem; color:var(--brand-dark); text-decoration:none; margin-bottom:1.25rem; }
+    .gb-logo .gb-mark { width:2.2rem; height:2.2rem; flex:none; }
+    .gb-nav a { display:flex; align-items:center; gap:.7rem; padding:.65rem .9rem; border-radius:999px; text-decoration:none; color:var(--ink); font-weight:600; }
+    .gb-nav a:hover { background:var(--soft); }
+    .gb-nav a.on { background:var(--soft2); color:var(--brand-dark); }
+    .gb-nav .grp { font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:1rem .9rem .3rem; font-weight:700; }
+    .gb-main { padding:1.5rem clamp(1rem,3vw,2.5rem) 3rem; min-width:0; }
+    .gb-top { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+    .gb-top h1 { font-size:1.75rem; font-weight:800; letter-spacing:-.02em; margin:0; }
+    .gb-user { display:flex; align-items:center; gap:.6rem; font-size:.9rem; color:var(--muted); }
+    .gb-card { background:var(--surface); border:1px solid var(--line); border-radius:1.25rem; box-shadow:0 8px 24px var(--shadow); padding:1.25rem; }
+    .gb-stat .n { font-size:2rem; font-weight:800; letter-spacing:-.03em; line-height:1.1; }
+    .gb-stat .l { color:var(--muted); font-size:.85rem; font-weight:600; }
+    .gb-badge { display:inline-block; padding:.12rem .6rem; border-radius:99px; font-size:.78rem; font-weight:700; background:var(--soft2); color:var(--brand); white-space:nowrap; }
+    .gb-badge.accepted { background:#dcf7e8; color:#0b6b3a; } .gb-badge.rejected { background:#fdecec; color:#b42318; }
+    .gb-badge.draft, .gb-badge.cancelled { background:#eef1f5; color:#475569; } .gb-badge.ready, .gb-badge.queued, .gb-badge.processing { background:#fff4d6; color:#6b4a00; }
+    .gb-table th { font-size:.75rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:700; border-bottom:1px solid var(--line); }
+    .gb-table td { vertical-align:middle; }
+    .gb-check { display:flex; gap:.75rem; padding:.7rem 0; border-bottom:1px solid var(--line); }
+    .gb-check:last-child { border:0; }
+    .gb-dot { flex:0 0 1.5rem; height:1.5rem; border-radius:50%; display:grid; place-items:center; font-size:.8rem; font-weight:800; color:#fff; }
+    .gb-dot.ok { background:#12a150; } .gb-dot.bad { background:#d92d20; } .gb-dot.warn { background:#f79009; }
+    .gb-modal { position:fixed; inset:0; z-index:100; display:none; align-items:center; justify-content:center; background:rgba(2,11,36,.55); backdrop-filter:blur(3px); padding:1rem; }
+    .gb-modal.open { display:flex; }
+    .gb-dialog { background:var(--surface); color:var(--ink); border:1px solid var(--line); border-radius:1.5rem; padding:1.5rem; width:min(26rem,100%); box-shadow:0 30px 60px rgba(0,0,0,.35); animation:gbpop .15s ease-out; }
+    .gb-dialog .ic { width:3rem; height:3rem; border-radius:50%; display:grid; place-items:center; font-size:1.4rem; background:var(--soft2); margin-bottom:.75rem; }
+    .gb-dialog.danger .ic { background:#fdecec; }
+    .gb-dialog h2 { font-size:1.15rem; font-weight:800; margin:0 0 .35rem; }
+    .gb-dialog p { color:var(--muted); margin:0 0 1.25rem; font-size:.92rem; }
+    .gb-dialog .acts { display:flex; gap:.5rem; justify-content:flex-end; }
+    .gb-dialog.danger .btn-primary { background:#d92d20 !important; border-color:#d92d20 !important; }
+    @keyframes gbpop { from { transform:scale(.94); opacity:0 } to { transform:none; opacity:1 } }
+    .gb-main .container, .gb-main .page-shell, .gb-main .app-main, .gb-main .wizard { max-width:none !important; width:100% !important; }
+    .gb-main { padding:1rem clamp(.75rem,1.6vw,1.75rem) 1.5rem; }
+    .gb-top { margin-bottom:.9rem; } .gb-top h1 { font-size:1.4rem; }
+    .gb-fill { height:calc(100vh - 8.5rem); display:flex; flex-direction:column; min-height:22rem; }
+    .gb-scroll { overflow:auto; flex:1 1 auto; min-height:0; }
+    .gb-scroll thead th { position:sticky; top:0; background:var(--surface); z-index:1; }
+    #detail { overflow:auto; }
+    .gb-dl { display:grid; grid-template-columns:5.5rem 1fr; gap:.25rem .75rem; font-size:.88rem; margin:0; } .gb-dl dt { color:var(--muted); font-weight:700; } .gb-dl dd { margin:0; word-break:break-all; }
+    .gb-hist { font-size:.8rem; color:var(--muted); padding-left:1.1rem; margin:.25rem 0 .75rem; }
+    .gb-aibox { background:var(--soft); border-radius:1rem; padding:.75rem 1rem; } .gb-aibox pre { white-space:pre-wrap; font:inherit; margin:.4rem 0 0; }
+    .gb-grid-2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,26rem),1fr)); gap:1rem; align-items:start; }
+    @media (max-width:1199px) { .gb-fill { height:auto; } .gb-scroll { max-height:60vh; } }
+    .gb-top h1:empty { display:none; }
+    .gb-tools { position:relative; }
+    .gb-themebtn { border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:999px; padding:.3rem .8rem; font-weight:700; font-size:.85rem; }
+    .gb-pop { position:absolute; right:0; top:2.6rem; z-index:50; width:min(22rem,92vw); background:var(--surface); border:1px solid var(--line); border-radius:1.25rem; box-shadow:0 18px 40px var(--shadow); padding:1rem; display:none; }
+    .gb-pop.open { display:block; }
+    .gb-sw { display:flex; flex-wrap:wrap; gap:.5rem; margin:.5rem 0 1rem; }
+    .gb-sw button { display:flex; align-items:center; gap:.4rem; border:2px solid var(--line); background:var(--surface); color:var(--ink); border-radius:999px; padding:.2rem .7rem .2rem .25rem; font-size:.8rem; font-weight:700; }
+    .gb-sw button.on { border-color:var(--brand); }
+    .gb-sw i { width:1.3rem; height:1.3rem; border-radius:50%; display:inline-block; }
+    .gb-sug { border:1px solid var(--line); border-radius:.9rem; padding:.5rem .7rem; margin-top:.5rem; display:flex; justify-content:space-between; gap:.5rem; align-items:center; font-size:.82rem; }
+    html, body { overflow-x:hidden; }
+    .gb-main img, .gb-main canvas, .gb-main video { max-width:100%; height:auto; }
+    .gb-card { overflow-x:auto; }
+    .gb-stat .n { font-size:clamp(1.4rem,2.2vw,2rem); }
+    .gb-menu-btn, .gb-bar, .gb-backdrop { display:none; }
+    .gb-nav a .t { overflow:hidden; text-overflow:ellipsis; }
+    .gb-cr { display:grid; grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr)); gap:.5rem; }
+    .gb-cr .it { background:var(--soft); border-radius:1rem; padding:.55rem .75rem; font-size:.8rem; color:var(--muted); }
+    .gb-cr .it b { display:block; color:var(--ink); font-size:1.05rem; }
+    .gb-flag { display:inline-block; width:1.4rem; height:.9rem; border-radius:2px; vertical-align:-.1rem; background:linear-gradient(#002b7f 0 16%,#fff 16% 32%,#ce1126 32% 68%,#fff 68% 84%,#002b7f 84%); border:1px solid var(--line); }
+    @media (min-width:992px) and (max-height:820px) { .gb-nav a { padding:.42rem .8rem; } .gb-nav .grp { margin:.6rem .9rem .2rem; } .gb-logo { margin-bottom:.6rem; } }
+    .gb-aibtn { border:1px solid var(--line,rgba(128,128,128,.35)); background:transparent; color:inherit; border-radius:999px; padding:.3rem .8rem; font-weight:700; font-size:.85rem; }
+    .gb-ai { position:fixed; top:0; right:0; bottom:0; width:min(420px,100vw); z-index:1080; display:flex; flex-direction:column; background:var(--card,#1b2338); color:inherit; border-left:1px solid rgba(128,128,128,.3); box-shadow:-12px 0 40px rgba(0,0,0,.35); transform:translateX(105%); transition:transform .22s; }
+    .gb-ai.open { transform:none; }
+    .gb-ai header { display:flex; align-items:center; justify-content:space-between; padding:.9rem 1rem; border-bottom:1px solid rgba(128,128,128,.25); font-weight:800; }
+    .gb-ai .log { flex:1; overflow-y:auto; padding:1rem; display:flex; flex-direction:column; gap:.6rem; }
+    .gb-ai .msg { padding:.6rem .8rem; border-radius:1rem; white-space:pre-wrap; font-size:.9rem; max-width:92%; }
+    .gb-ai .msg.me { align-self:flex-end; background:var(--brand,#0b6bff); color:#fff; }
+    .gb-ai .msg.bot { background:rgba(128,128,128,.16); }
+    .gb-ai .chips { display:flex; flex-wrap:wrap; gap:.4rem; padding:0 1rem .5rem; }
+    .gb-ai .chips button { border:1px solid rgba(128,128,128,.4); background:transparent; color:inherit; border-radius:999px; padding:.2rem .7rem; font-size:.78rem; }
+    .gb-ai form { display:flex; gap:.4rem; padding:.8rem 1rem calc(.8rem + env(safe-area-inset-bottom)); border-top:1px solid rgba(128,128,128,.25); }
+    @media (max-width:991px) { .gb-ai { bottom:0; } .gb-ai form { margin-bottom:0; } }
+    @media (max-width:575px) { .gb-aibtn { padding:.3rem .55rem; font-size:0; } .gb-aibtn::first-letter { font-size:1rem; } }
+    .gb-clamp { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+    .gb-fill-xxl .gb-scroll { max-height:26rem; }
+    @media (min-width:1400px) { .gb-fill-xxl { height:calc(100vh - 8.5rem); min-height:22rem; display:flex; flex-direction:column; } .gb-fill-xxl .gb-scroll { max-height:none; } }
+    @media (min-width:768px) and (max-width:1399px) { .gb-colinfo { display:none; } }
+    .gb-acts { display:flex; flex-wrap:wrap; gap:.25rem; }
+    .gb-sticky { position:sticky; top:1rem; }
+    @media (max-width:767px) {
+      .gb-stack thead { display:none; }
+      .gb-stack tr { display:flex; flex-wrap:wrap; align-items:center; gap:.2rem .6rem; padding:.7rem 0; border-bottom:1px solid var(--line); }
+      .gb-stack td { border:0 !important; padding:0 !important; background:none !important; box-shadow:none !important; }
+      .gb-stack td.gb-full { flex:1 1 100%; }
+      .gb-stack td.gb-grow { flex:1 1 0; min-width:40%; font-weight:700; }
+      .gb-stack td.gb-sub { color:var(--muted); font-size:.8rem; }
+    }
+    @media (min-width:992px) and (max-width:1199px) {
+      .gb-shell { grid-template-columns:72px minmax(0,1fr); }
+      .gb-side { padding:1rem .5rem; align-items:center; }
+      .gb-logo > span, .gb-nav .grp, .gb-side-foot { display:none; }
+      .gb-nav a { justify-content:center; padding:.7rem; font-size:1.2rem; }
+      .gb-nav a .t { display:none; }
+    }
+    @media (max-width: 991px) {
+      .gb-shell { display:block; }
+      .gb-side { position:fixed; left:0; top:0; bottom:0; width:min(18rem,84vw); height:auto; transform:translateX(-102%); transition:transform .22s ease; box-shadow:12px 0 40px rgba(0,0,0,.35); border-right:1px solid var(--line); padding:1.1rem 1rem; z-index:90; }
+      body.nav-open .gb-side { transform:none; }
+      .gb-backdrop { position:fixed; inset:0; z-index:80; background:rgba(2,11,36,.5); backdrop-filter:blur(2px); }
+      body.nav-open .gb-backdrop { display:block; }
+      body.nav-open { overflow:hidden; }
+      .gb-menu-btn { display:inline-grid; place-items:center; width:2.5rem; height:2.5rem; border-radius:.9rem; border:1px solid var(--line); background:var(--surface); color:var(--ink); font-size:1.2rem; flex:0 0 auto; }
+      .gb-top { position:sticky; top:0; z-index:40; background:var(--bg,var(--surface)); padding:.5rem 0; margin-bottom:.6rem; flex-wrap:nowrap; }
+      .gb-top h1 { flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .gb-main { padding-bottom:calc(5rem + env(safe-area-inset-bottom)); }
+      .gb-bar { display:grid; grid-template-columns:repeat(5,1fr); position:fixed; left:0; right:0; bottom:0; z-index:70; background:var(--surface); border-top:1px solid var(--line); padding:.3rem .25rem calc(.3rem + env(safe-area-inset-bottom)); }
+      .gb-bar a, .gb-bar button { display:flex; flex-direction:column; align-items:center; gap:.1rem; font-size:.68rem; font-weight:700; color:var(--muted); text-decoration:none; background:none; border:0; padding:.3rem 0; }
+      .gb-bar a.on { color:var(--brand); }
+      .gb-bar .ico { font-size:1.25rem; line-height:1; }
+      .gb-bar .plus .ico { background:var(--brand); color:#fff; width:2.6rem; height:2.6rem; border-radius:50%; display:grid; place-items:center; margin-top:-1.2rem; box-shadow:0 6px 16px var(--shadow); }
+      .gb-user .uname, .gb-user form { display:none; }
+      .gb-fill { height:auto; min-height:0; }
+    }
+    @media (max-width:575px) {
+      .gb-main { padding-left:.65rem; padding-right:.65rem; }
+      .gb-top .gb-env { display:none; }
+      .gb-card { padding:.9rem; border-radius:1rem; }
+      .gb-dialog { padding:1.1rem; }
+      .gb-dialog .acts { flex-direction:column-reverse; } .gb-dialog .acts .btn { width:100%; }
+      .btn { min-height:2.5rem; }
+      .gb-pop { position:fixed; left:.5rem; right:.5rem; top:3.8rem; width:auto; max-height:80vh; overflow:auto; }
+      .gb-table { font-size:.82rem; }
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+{% with name=request.resolver_match.url_name %}
+<div class="gb-shell">
+  <aside class="gb-side">
+    <a class="gb-logo" href="{% url 'dashboard' %}">{% include "validador/_logo.html" with cls="" %}<span>Guana<span class="text-primary">Bill</span></span></a>
+    <nav class="gb-nav">
+      <a href="{% url 'dashboard' %}" class="{% if name == 'dashboard' %}on{% endif %}"><span>🏠</span><span class="t">Panel</span></a>
+      <div class="grp">Facturación</div>
+      <a href="{% url 'issued_invoice_list' %}" class="{% if name == 'issued_invoice_list' %}on{% endif %}"><span>🧾</span><span class="t">Facturas</span></a>
+      <a href="{% url 'invoice_wizard' %}" class="{% if name == 'invoice_wizard' %}on{% endif %}"><span>➕</span><span class="t">Nueva factura</span></a>
+      <a href="{% url 'import_invoices' %}" class="{% if name == 'import_invoices' %}on{% endif %}"><span>📥</span><span class="t">Importar Excel</span></a>
+      <div class="grp">Control</div>
+      <a href="{% url 'closures' %}" class="{% if name == 'closures' %}on{% endif %}"><span>✅</span><span class="t">Cierre de periodo</span></a>
+      <a href="{% url 'activity_log' %}" class="{% if name == 'activity_log' %}on{% endif %}"><span>📜</span><span class="t">Bitácora</span></a>
+      <a href="{% url 'hacienda_flow' %}" class="{% if name == 'hacienda_flow' %}on{% endif %}"><span>🛰️</span><span class="t">Flujo Hacienda</span></a>
+      <div class="grp">Conectar</div>
+      <a href="{% url 'integrations' %}" class="{% if name == 'integrations' %}on{% endif %}"><span>🔌</span><span class="t">Integraciones API</span></a>
+      <a href="{% url 'mobile_capture' %}"><span>📱</span><span class="t">Captura móvil</span></a>
+      <div class="grp">Herramientas</div>
+      <a href="{% url 'index' %}" class="{% if name == 'index' %}on{% endif %}"><span>📊</span><span class="t">Análisis de datos</span></a>
+    </nav>
+    <div class="gb-side-foot mt-auto small text-secondary px-2">
+      {% if gb_environment_label %}<span class="gb-env">{{ gb_environment_label }}</span>{% endif %}
+      <div class="mt-2">Conectado a Hacienda (ATV).</div>
+    </div>
+  </aside>
+  <main class="gb-main">
+    {% csrf_token %}
+    <div class="gb-top">
+      <button type="button" class="gb-menu-btn" id="gb-menu" aria-label="Abrir menú">☰</button>
+      <h1>{% block heading %}{% endblock %}</h1>
+      <div class="gb-user">
+        {% if gb_environment_label %}<span class="gb-env d-lg-none">{{ gb_environment_label }}</span>{% endif %}
+        <button type="button" class="gb-aibtn" id="gb-aibtn" aria-expanded="false">✨ Asistente</button>
+        <div class="gb-tools">
+          <button type="button" class="gb-themebtn" id="gb-themebtn" aria-expanded="false">🎨 Tema</button>
+          <div class="gb-pop" id="gb-pop" role="dialog" aria-label="Cambiar tema">
+            <strong>Tema de la aplicación</strong>
+            <div class="gb-sw" id="gb-sw">{% for t in gb_themes %}<button type="button" data-theme-key="{{ t.key }}" class="{% if t.key == gb_theme %}on{% endif %}"><i style="background:linear-gradient(135deg,{{ t.colors.1 }},{{ t.colors.2 }})"></i>{{ t.label }}</button>{% endfor %}</div>
+            <input class="form-control form-control-sm" id="gb-mood" maxlength="300" placeholder="Ej.: algo fresco y tranquilo (opcional)">
+            <button type="button" class="btn btn-primary btn-sm w-100 mt-2" id="gb-ai">✨ Recomendar con IA</button>
+            <div id="gb-sugs" aria-live="polite"></div>
+          </div>
+        </div>
+        <span class="uname">{{ request.user.username }}</span>
+        <form method="post" action="{% url 'logout' %}" class="m-0">{% csrf_token %}<button class="btn btn-outline-primary btn-sm" type="submit">Salir</button></form>
+      </div>
+    </div>
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% endwith %}
+<div class="gb-backdrop" id="gb-backdrop"></div>
+<nav class="gb-bar" aria-label="Navegación rápida">
+  <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}on{% endif %}"><span class="ico">🏠</span>Panel</a>
+  <a href="{% url 'issued_invoice_list' %}" class="{% if request.resolver_match.url_name == 'issued_invoice_list' %}on{% endif %}"><span class="ico">🧾</span>Facturas</a>
+  <a href="{% url 'invoice_wizard' %}" class="plus"><span class="ico">＋</span>Nueva</a>
+  <a href="{% url 'closures' %}" class="{% if request.resolver_match.url_name == 'closures' %}on{% endif %}"><span class="ico">✅</span>Cierre</a>
+  <button type="button" id="gb-menu2"><span class="ico">☰</span>Más</button>
+</nav>
+<script>
+(function(){var b=document.body;function t(o){b.classList.toggle('nav-open',o)}
+['gb-menu','gb-menu2'].forEach(function(i){var e=document.getElementById(i);if(e)e.addEventListener('click',function(){t(!b.classList.contains('nav-open'))})});
+document.getElementById('gb-backdrop').addEventListener('click',function(){t(false)});
+document.querySelectorAll('.gb-side a').forEach(function(a){a.addEventListener('click',function(){t(false)})});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')t(false)});
+window.addEventListener('resize',function(){if(innerWidth>991)t(false)});})();
+</script>
+<aside class="gb-ai" id="gb-ai-panel" aria-label="Asistente de IA" data-context="{{ gb_ai_context }}" data-url="{% url 'api_ai_assistant' %}">
+  <header><span>✨ Asistente GuanaBill</span><button type="button" class="btn btn-sm btn-outline-secondary" id="gb-ai-close" aria-label="Cerrar">✕</button></header>
+  <div class="log" id="gb-ai-log" aria-live="polite"></div>
+  <div class="chips" id="gb-ai-chips"></div>
+  <form id="gb-ai-form"><input class="form-control" id="gb-ai-q" maxlength="600" placeholder="Pregunta lo que necesites…" autocomplete="off"><button class="btn btn-primary" type="submit">Enviar</button></form>
+</aside>
+<script>
+(() => {
+  const panel = document.getElementById("gb-ai-panel"), log = document.getElementById("gb-ai-log"), chips = document.getElementById("gb-ai-chips");
+  const ctx0 = panel.dataset.context;
+  const QUICK = {
+    manual: ["¿Cómo lleno esta factura?", "¿Qué tarifa de IVA uso?", "¿Qué pasa cuando la envío?"],
+    excel: ["¿Cómo preparo mi Excel?", "Explícame los errores", "¿Qué pasa tras importar?"],
+    api: ["¿Cómo integro mi sistema?", "¿Cómo evito duplicados?", "¿Cómo veo la respuesta de Hacienda?"],
+    cierre: ["¿Qué me falta para cerrar?", "¿Qué hago con las rechazadas?"],
+    facturas: ["¿Qué hago con una rechazada?", "¿Cuál es el siguiente paso?"],
+    general: ["¿Por dónde empiezo?", "¿Cómo cierro el mes?"],
+  };
+  const say = (text, who) => { const m = document.createElement("div"); m.className = "msg " + who; m.textContent = text; log.appendChild(m); log.scrollTop = log.scrollHeight; return m; };
+  const csrf = () => document.querySelector("[name=csrfmiddlewaretoken]").value;
+  async function ask(q, opts = {}) {
+    panel.classList.add("open"); say(q, "me"); const wait = say("Pensando con IA local…", "bot");
+    try {
+      const res = await fetch(panel.dataset.url, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+        body: JSON.stringify({ context: opts.context || ctx0, question: q, period: opts.period || "", extra: window.gbAiExtra ? String(window.gbAiExtra()).slice(0, 1500) : "" }) });
+      const d = await res.json();
+      wait.textContent = res.ok ? (d.ai_used ? "" : "(IA local no disponible; guía básica)\n") + d.answer : (d.detail || "No se pudo consultar al asistente.");
+    } catch { wait.textContent = "No se pudo contactar al asistente."; }
+    log.scrollTop = log.scrollHeight;
+  }
+  (QUICK[ctx0] || QUICK.general).forEach(q => { const b = document.createElement("button"); b.type = "button"; b.textContent = q; b.onclick = () => ask(q); chips.appendChild(b); });
+  say("Hola, soy tu asistente. Te acompaño desde que ingresas la factura hasta que Hacienda responde. Elige una pregunta o escribe la tuya.", "bot");
+  const toggle = (o) => { panel.classList.toggle("open", o); document.getElementById("gb-aibtn").setAttribute("aria-expanded", o); };
+  document.getElementById("gb-aibtn").onclick = () => toggle(!panel.classList.contains("open"));
+  document.getElementById("gb-ai-close").onclick = () => toggle(false);
+  document.getElementById("gb-ai-form").onsubmit = (e) => { e.preventDefault(); const i = document.getElementById("gb-ai-q"); if (i.value.trim()) { ask(i.value.trim()); i.value = ""; } };
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-gb-ask]"); if (b) ask(b.dataset.gbQ || "Guíame.", { context: b.dataset.gbAsk, period: b.dataset.gbPeriod }); });
+  window.gbAsk = ask;
+})();
+</script>
+<div class="gb-modal" id="gb-modal" role="dialog" aria-modal="true" aria-labelledby="gb-m-title">
+  <div class="gb-dialog" id="gb-dialog">
+    <div class="ic" id="gb-m-ic">❓</div>
+    <h2 id="gb-m-title"></h2>
+    <p id="gb-m-text"></p>
+    <div class="acts"><button type="button" class="btn btn-outline-secondary" id="gb-m-no">Cancelar</button><button type="button" class="btn btn-primary" id="gb-m-yes">Confirmar</button></div>
+  </div>
+</div>
+<script>
+window.gbConfirm = (opts) => new Promise((resolve) => {
+  const m = document.getElementById("gb-modal"), dlg = document.getElementById("gb-dialog");
+  const yes = document.getElementById("gb-m-yes"), no = document.getElementById("gb-m-no");
+  document.getElementById("gb-m-title").textContent = opts.title || "¿Confirmas esta acción?";
+  document.getElementById("gb-m-text").textContent = opts.text || "";
+  document.getElementById("gb-m-ic").textContent = opts.icon || (opts.danger ? "⚠️" : "❓");
+  yes.textContent = opts.ok || "Confirmar"; dlg.classList.toggle("danger", !!opts.danger);
+  const done = (v) => { m.classList.remove("open"); document.removeEventListener("keydown", key); yes.onclick = no.onclick = m.onclick = null; resolve(v); };
+  const key = (e) => { if (e.key === "Escape") done(false); };
+  document.addEventListener("keydown", key);
+  yes.onclick = () => done(true); no.onclick = () => done(false); m.onclick = (e) => { if (e.target === m) done(false); };
+  m.classList.add("open"); no.focus();
+});
+document.addEventListener("click", async (e) => {
+  const el = e.target.closest("[data-confirm]");
+  if (!el) return;
+  if (el.dataset.confirmed) { delete el.dataset.confirmed; return; }
+  e.preventDefault(); e.stopImmediatePropagation();
+  const ok = await gbConfirm({ title: el.dataset.confirmTitle, text: el.dataset.confirm, ok: el.dataset.confirmOk, danger: el.dataset.confirmDanger === "1", icon: el.dataset.confirmIcon });
+  if (ok) { el.dataset.confirmed = "1"; el.click(); }
+}, true);
+</script>
+<script>
+(() => {
+  const root = document.documentElement, pop = document.getElementById("gb-pop"), btn = document.getElementById("gb-themebtn");
+  const token = () => document.querySelector("[name=csrfmiddlewaretoken]").value;
+  const call = (body) => fetch("{% url 'api_design_theme' %}", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-CSRFToken": token() }, body: JSON.stringify(body) }).then(r => r.json());
+  const mark = (key) => document.querySelectorAll("#gb-sw button").forEach(b => b.classList.toggle("on", b.dataset.themeKey === key));
+  const apply = (key) => { root.dataset.theme = key; mark(key); call({ action: "save", theme: key }); };
+  btn.addEventListener("click", () => { const open = pop.classList.toggle("open"); btn.setAttribute("aria-expanded", open); });
+  document.addEventListener("click", (e) => { if (!pop.contains(e.target) && e.target !== btn) pop.classList.remove("open"); });
+  document.getElementById("gb-sw").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) apply(b.dataset.themeKey); });
+  const ai = document.getElementById("gb-ai"), box = document.getElementById("gb-sugs");
+  ai.addEventListener("click", async () => {
+    ai.disabled = true; ai.textContent = "Pensando…"; box.textContent = "";
+    try {
+      const data = await call({ action: "recommend", description: document.getElementById("gb-mood").value });
+      const note = document.createElement("div"); note.className = "small text-secondary mt-2";
+      note.textContent = data.ai_used ? "Sugerencias de la IA local:" : "IA no disponible; sugerencias por afinidad:"; box.append(note);
+      (data.suggestions || []).forEach((s) => {
+        const row = document.createElement("div"); row.className = "gb-sug";
+        const txt = document.createElement("span"); txt.textContent = `${s.label}: ${s.reason}`;
+        const go = document.createElement("button"); go.type = "button"; go.className = "btn btn-outline-primary btn-sm"; go.textContent = "Probar";
+        go.onclick = () => apply(s.theme);
+        row.append(txt, go); box.append(row);
+      });
+      if (data.suggestions && data.suggestions[0]) root.dataset.theme = data.suggestions[0].theme, mark(data.suggestions[0].theme), call({ action: "save", theme: data.suggestions[0].theme });
+    } catch (err) { box.textContent = "No se pudo obtener recomendaciones."; }
+    ai.disabled = false; ai.textContent = "✨ Recomendar con IA";
+  });
+})();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

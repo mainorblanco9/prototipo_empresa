@@ -1,0 +1,151 @@
+{% extends 'validador/_shell.html' %}
+{% block title %}Facturas{% endblock %}
+{% block heading %}Facturas{% endblock %}
+{% block content %}
+<div class="gb-card mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-6 col-md-3"><label class="form-label small fw-bold">Estado</label>
+      <select class="form-select" id="f-status"><option value="">Todos</option>
+        <option value="draft">Borrador</option><option value="ready">Listo para envío</option><option value="processing">Procesando</option>
+        <option value="accepted">Aceptado</option><option value="rejected">Rechazado</option><option value="cancelled">Anulado</option></select></div>
+    <div class="col-6 col-md-3"><label class="form-label small fw-bold">Periodo</label><input class="form-control" type="month" id="f-month"></div>
+    <div class="col-12 col-md-3"><label class="form-label small fw-bold">Buscar receptor</label><input class="form-control" id="f-q" placeholder="Nombre"></div>
+    <div class="col-12 col-md-3 d-flex gap-2"><button class="btn btn-primary flex-fill" id="send-ready" data-confirm-title="¿Enviar todas las listas?" data-confirm="Se enviarán a Hacienda todas las facturas listas de esta vista." data-confirm-ok="Enviar todas" data-confirm-icon="📤" type="button">Enviar todas las listas</button>
+      <a class="btn btn-outline-primary" href="{% url 'invoice_wizard' %}">＋</a></div>
+  </div>
+</div>
+<div id="msg" class="alert alert-warning py-2" hidden role="status"></div>
+<div class="row g-3 gb-split">
+  <div class="col-xl-8">
+    <div class="gb-card gb-fill">
+      <div class="gb-scroll"><table class="table gb-table gb-stack table-hover mb-0">
+        <thead><tr><th>Fecha</th><th>Receptor</th><th class="text-end">Total ₡</th><th>Estado</th><th class="gb-colinfo">Respuesta</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table></div>
+      <div class="d-flex justify-content-between align-items-center pt-2"><span class="small text-secondary" id="count"></span>
+        <button class="btn btn-outline-primary btn-sm" id="more" type="button" hidden>Cargar más</button></div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <aside class="gb-card gb-fill" id="detail" aria-live="polite">
+      <div class="text-secondary" id="detail-empty">Selecciona una factura para ver emisor, receptor, líneas, historial y el análisis de la respuesta de Hacienda.</div>
+      <div id="detail-body" hidden>
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div><div class="small text-secondary fw-bold text-uppercase">Factura electrónica</div><div class="fs-5 fw-bold" id="d-total"></div></div>
+          <span class="gb-badge" id="d-status"></span>
+        </div>
+        <dl class="gb-dl mt-2">
+          <dt>Emisor</dt><dd id="d-issuer"></dd><dt>Receptor</dt><dd id="d-receiver"></dd>
+          <dt>Fecha</dt><dd id="d-date"></dd><dt>Respuesta</dt><dd id="d-msg"></dd><dt>Clave</dt><dd id="d-clave" class="font-monospace small"></dd>
+        </dl>
+        <table class="table table-sm gb-table"><thead><tr><th>Detalle</th><th class="text-end">Cant.</th><th class="text-end">IVA</th><th class="text-end">Total</th></tr></thead><tbody id="d-lines"></tbody></table>
+        <div class="small text-secondary fw-bold text-uppercase mt-2">Historial</div><ol class="gb-hist" id="d-hist"></ol>
+        <div id="ai" hidden class="gb-aibox"><strong>✨ Análisis de la respuesta de Hacienda</strong><pre id="ai-text"></pre></div>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const csrf = () => document.querySelector("[name=csrfmiddlewaretoken]").value;
+  const params = new URLSearchParams(location.search);
+  if (params.get("status")) $("f-status").value = params.get("status");
+  if (params.get("period")) $("f-month").value = params.get("period");
+  const api = async (path, options = {}) => {
+    const res = await fetch(path, { credentials: "same-origin", ...options,
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf(), ...(options.headers || {}) } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
+    return data;
+  };
+  const note = (t) => { $("msg").hidden = !t; $("msg").textContent = t || ""; };
+  const cell = (tr, text, cls) => { const td = tr.insertCell(); td.textContent = text; if (cls) td.className = cls; return td; };
+  let nextUrl = null, items = [], selected = null;
+  const money = (v) => Number(v).toLocaleString("es-CR", { minimumFractionDigits: 2 });
+  async function show(inv) {
+    selected = inv.id; $("detail-empty").hidden = true; $("detail-body").hidden = false; $("ai").hidden = true;
+    const [full, hist] = await Promise.all([api(`/api/v1/invoices/${inv.id}/`), api(`/api/v1/invoices/${inv.id}/history/`)]);
+    const doc = full.document;
+    $("d-total").textContent = "₡" + money(full.total); const st = $("d-status"); st.className = "gb-badge " + full.status; st.textContent = full.status_label;
+    $("d-issuer").textContent = `${doc.issuer.name} · ${doc.issuer.identification}`; $("d-receiver").textContent = `${doc.receiver.name} · ${doc.receiver.identification}`;
+    $("d-msg").textContent = full.hacienda_message || "—"; $("d-date").textContent = full.issue_date.split("-").reverse().join("/"); $("d-clave").textContent = full.clave || "Aún sin clave (se asigna al enviar)";
+    $("d-lines").replaceChildren(...doc.lines.map(l => { const tr = document.createElement("tr"); [l.description, l.quantity, money(l.tax_amount), money(l.total)].forEach((v, i) => { const td = tr.insertCell(); td.textContent = v; if (i) td.className = "text-end"; }); return tr; }));
+    $("d-hist").replaceChildren(...hist.map(h => { const li = document.createElement("li"); li.textContent = `${new Date(h.created_at).toLocaleString("es-CR")} · ${h.from_status || "—"} → ${h.to_status}`; return li; }));
+    if (full.ai_analysis) { $("ai").hidden = false; $("ai-text").textContent = full.ai_analysis; }
+  }
+
+  async function analyze(id) {
+    if ($("detail-body").hidden || selected !== id) await show({ id });
+    $("ai").hidden = false; $("ai-text").textContent = "Analizando con IA local…";
+    const d = await api(`/api/v1/invoices/${id}/ai-analysis/`, { method: "POST" });
+    $("ai-text").textContent = (d.ai_used ? "" : "(IA no disponible; análisis básico)\n") + d.analysis;
+  }
+  async function fixHelp(id) {
+    if ($("detail-body").hidden || selected !== id) await show({ id });
+    $("ai").hidden = false; $("ai-text").textContent = "Buscando cómo corregirla con IA local…";
+    const d = await api(`/api/v1/invoices/${id}/ai-fix/`, { method: "POST" });
+    $("ai-text").textContent = (d.ai_used ? "" : "(IA no disponible; guía básica)\n") + d.guidance;
+  }
+  const post = (inv, to) => api(`/api/v1/invoices/${inv.id}/transition/`, { method: "POST", body: JSON.stringify({ to, version: inv.version }) });
+
+  function row(inv) {
+    const tr = document.createElement("tr"); tr.style.cursor = "pointer"; tr.onclick = (e) => { if (!e.target.closest("button")) show(inv).catch(err => note(err.message)); };
+    cell(tr, inv.issue_date.split("-").reverse().join("/"), "gb-sub");
+    cell(tr, inv.receiver_name, "gb-grow");
+    cell(tr, "₡" + Number(inv.total).toLocaleString("es-CR", { minimumFractionDigits: 2 }), "text-end fw-semibold");
+    const b = document.createElement("span"); b.className = "gb-badge " + inv.status; b.textContent = inv.status_label; cell(tr, "").appendChild(b);
+    const info = cell(tr, "", "gb-colinfo gb-full gb-sub"); const clamp = document.createElement("span"); clamp.className = "gb-clamp"; clamp.textContent = inv.hacienda_message || inv.clave || "—"; clamp.title = clamp.textContent; info.appendChild(clamp); info.style.maxWidth = "240px";
+    const actions = tr.insertCell(); actions.className = "gb-full";
+    const add = (label, fn, outline, ask) => {
+      const btn = document.createElement("button"); if (ask) Object.assign(btn.dataset, ask); btn.className = "btn btn-sm me-1 " + (outline ? "btn-outline-primary" : "btn-primary"); btn.textContent = label;
+      btn.onclick = async () => { btn.disabled = true; note(""); try { await fn(); } catch (e) { note(e.message); } load(); };
+      actions.appendChild(btn);
+    };
+    if (["draft", "ready"].includes(inv.status)) add("Validar", async () => {
+      const d = await api(`/api/v1/invoices/${inv.id}/validate/`, { method: "POST" });
+      note(d.valid ? "✔ Validación local superada: lista para enviar (no se envió nada a Hacienda)." : "✖ Corrige antes de enviar: " + d.issues.map(i => i.message).join(" "));
+    }, true);
+    if (["draft", "rejected"].includes(inv.status)) { const a = document.createElement("a"); a.className = "btn btn-sm btn-outline-primary me-1"; a.href = "{% url 'invoice_wizard' %}?editar=" + inv.id; a.textContent = "✏️ Editar"; actions.appendChild(a); }
+    if (inv.status === "draft") { add("Marcar lista", () => post(inv, "ready")); add("Anular", () => post(inv, "cancelled"), true, { confirmTitle: "¿Anular la factura?", confirm: "La factura de " + inv.receiver_name + " quedará anulada y no se enviará a Hacienda.", confirmOk: "Anular", confirmDanger: "1" }); }
+    if (["ready", "queued", "processing"].includes(inv.status)) add("Enviar", async () => { await api(`/api/v1/invoices/${inv.id}/submit/`, { method: "POST" }); await analyze(inv.id); }, false, { confirmTitle: "¿Enviar a Hacienda?", confirm: "Se enviará la factura de " + inv.receiver_name + " por " + Number(inv.total).toLocaleString("es-CR") + " a Hacienda.", confirmOk: "Enviar", confirmIcon: "📤" });
+    if (["accepted", "rejected"].includes(inv.status)) add("✨ Analizar", () => analyze(inv.id), true, { confirmTitle: "¿Analizar con IA?", confirm: "La IA local revisará la respuesta de Hacienda. Puede tardar unos segundos.", confirmOk: "Analizar", confirmIcon: "✨" });
+    if (inv.status === "rejected") {
+      add("✨ ¿Cómo corregirla?", () => fixHelp(inv.id), true);
+      add("Reenviar igual", async () => { await post(inv, "ready"); const r = await api(`/api/v1/invoices/${inv.id}/`); await api(`/api/v1/invoices/${inv.id}/submit/`, { method: "POST" }); await analyze(inv.id); }, true, { confirmTitle: "¿Reenviar sin cambios?", confirm: "Se enviará de nuevo a Hacienda con una clave nueva. Si el rechazo fue por un dato, conviene editarla antes.", confirmOk: "Reenviar", confirmIcon: "📤" });
+      add("Anular", () => post(inv, "cancelled"), true, { confirmTitle: "¿Anular la factura rechazada?", confirm: "Quedará anulada y no se enviará a Hacienda.", confirmOk: "Anular", confirmDanger: "1" });
+    }
+    return tr;
+  }
+
+  function paint() {
+    const q = $("f-q").value.trim().toLowerCase();
+    const shown = items.filter(i => !q || i.receiver_name.toLowerCase().includes(q));
+    $("rows").replaceChildren(...shown.map(row));
+    if (!shown.length) { const td = $("rows").insertRow().insertCell(); td.colSpan = 6; td.className = "text-secondary"; td.textContent = "No hay facturas con esos filtros."; }
+    $("count").textContent = `${shown.length} facturas`; $("more").hidden = !nextUrl;
+  }
+  async function load(append) {
+    try {
+      let url = append && nextUrl;
+      if (!url) {
+        const p = new URLSearchParams(); if ($("f-status").value) p.set("status", $("f-status").value); if ($("f-month").value) p.set("month", $("f-month").value);
+        url = "/api/v1/invoices/?" + p;
+      }
+      const d = await api(url); items = append ? items.concat(d.results) : d.results; nextUrl = d.next; paint();
+    } catch (e) { note(e.message); }
+  }
+  ["f-status", "f-month"].forEach(id => $(id).onchange = () => load());
+  $("f-q").oninput = paint; $("more").onclick = () => load(true);
+  $("send-ready").onclick = async () => {
+    const ready = items.filter(i => i.status === "ready"); if (!ready.length) { note("No hay facturas listas en esta vista."); return; }
+    $("send-ready").disabled = true; let ok = 0, fail = 0;
+    for (const inv of ready) { try { await api(`/api/v1/invoices/${inv.id}/submit/`, { method: "POST" }); ok++; } catch (e) { fail++; } }
+    note(`Enviadas ${ok}; con error ${fail}.`); $("send-ready").disabled = false; load();
+  };
+  load();
+})();
+</script>
+{% endblock %}

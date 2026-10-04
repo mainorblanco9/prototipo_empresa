@@ -1,0 +1,267 @@
+﻿{% extends 'validador/_shell.html' %}
+{% block title %}Nueva factura{% endblock %}
+{% block heading %}Nueva factura{% endblock %}
+{% block head %}<style>
+    .wiz { max-width: 640px; }
+    .gb-cr .it b { font-size:.92rem; overflow-wrap:anywhere; }\n    .dots { display:flex; gap:.4rem; margin-bottom:1.5rem; }
+    .dots span { flex:1; height:6px; border-radius:99px; background:#d5dfec; }
+    .dots span.on { background: var(--brand-dark); }
+    .step { display:none; } .step.on { display:block; }
+    .gb-favs .chip { display:inline-flex; align-items:center; gap:.3rem; margin:0 .4rem .4rem 0; padding:.25rem .3rem .25rem .75rem; border:1px solid var(--line,rgba(128,128,128,.35)); border-radius:999px; font-size:.85rem; cursor:pointer; }
+    .gb-favs .chip button { border:0; background:none; color:inherit; opacity:.6; padding:0 .4rem; }
+    .big-q { font-size:1.6rem; font-weight:800; letter-spacing:-.02em; }
+    pre.api { background:#001435; color:#cfe6ff; border-radius:1rem; padding:1rem; font-size:.78rem; overflow:auto; }
+  </style>{% endblock %}
+{% block content %}<div class="row g-3"><div class="col-12 col-lg-7 col-xl-8">
+  <div class="gb-card">
+  <div class="alert alert-warning" id="edit-banner" hidden>
+    <strong id="edit-title">Editando factura</strong>
+    <div class="small mt-1" id="edit-msg"></div>
+    <button type="button" class="btn btn-sm btn-primary mt-2" id="edit-ai">✨ ¿Cómo la corrijo?</button>
+    <div class="small mt-2" id="edit-ai-out" style="white-space:pre-wrap"></div>
+  </div>
+  <div class="dots" id="dots"></div>
+  <form id="wiz" novalidate>
+    <section class="step on" data-step="0">
+      <p class="text-secondary mb-1">Paso 1 de 5</p>
+      <h1 class="big-q mb-3">¿Quién emite la factura?</h1>
+      <div class="gb-favs mb-3" data-kind="issuer"></div>
+      <label class="form-label fw-semibold">Nombre o razón social del emisor</label>
+      <input class="form-control mb-3" id="issuer_name"  autocomplete="off">
+      <label class="form-label fw-semibold">Cédula jurídica o física</label>
+      <input class="form-control" id="issuer_id" inputmode="numeric">
+    </section>
+    <section class="step" data-step="1">
+      <p class="text-secondary mb-1">Paso 2 de 5</p>
+      <h1 class="big-q mb-3">¿A quién se la emites?</h1>
+      <div class="gb-favs mb-3" data-kind="receiver"></div>
+      <label class="form-label fw-semibold">Nombre del receptor</label>
+      <input class="form-control mb-3" id="receiver_name" autocomplete="off">
+      <label class="form-label fw-semibold">Identificación del receptor</label>
+      <input class="form-control mb-3" id="receiver_id" inputmode="numeric">
+      <label class="form-label fw-semibold">Fecha de emisión</label>
+      <input class="form-control" id="issue_date" type="date">
+    </section>
+    <section class="step" data-step="2">
+      <p class="text-secondary mb-1">Paso 3 de 5</p>
+      <h1 class="big-q mb-3">¿Qué estás facturando?</h1>
+      <div id="lines"></div>
+      <button type="button" class="btn btn-outline-primary mt-2" id="add-line">+ Agregar línea</button>
+      <p class="small text-secondary mt-3">El precio es el final con IVA incluido; GuanaBill separa base e impuesto.</p>
+    </section>
+    <section class="step" data-step="3">
+      <p class="text-secondary mb-1">Paso 4 de 5</p>
+      <h1 class="big-q mb-3">Revisa el total</h1>
+      <div class="card p-3 mb-3"><div id="cost" class="fs-5 fw-bold">Calculando…</div></div>
+      <button type="button" class="btn btn-outline-primary mb-3" id="ai-btn">✨ Revisar con IA local</button>
+      <pre id="ai-text" class="small" style="white-space:pre-wrap;font:inherit"></pre>
+    </section>
+    <section class="step" data-step="4">
+      <p class="text-secondary mb-1">Paso 5 de 5</p>
+      <h1 class="big-q mb-3">Crear y validar</h1>
+      <p>La factura se crea con <code>POST /api/v1/invoices/</code>, la misma API que usan los proveedores.</p>
+      <div class="d-grid gap-2">
+        <button type="button" class="btn btn-outline-primary" id="save-btn">Crear factura (borrador)</button>
+        <button type="button" class="btn btn-primary" id="send-btn" data-confirm-title="¿Enviar a Hacienda?" data-confirm="Se creará la factura y se enviará a Hacienda. Esta acción no se puede deshacer." data-confirm-ok="Crear y enviar" data-confirm-icon="📤">Crear y enviar a Hacienda</button>
+      </div>
+      <div id="result" class="mt-3"></div>
+      <button type="button" class="btn btn-link px-0" id="blank-btn">＋ Nueva factura en blanco</button>
+      <pre class="api mt-3" id="payload" hidden></pre>
+    </section>
+    <div id="err" class="alert alert-danger mt-3" hidden></div>
+    <div class="d-flex justify-content-between mt-4">
+      <button type="button" class="btn btn-outline-primary" id="back">Atrás</button>
+      <button type="button" class="btn btn-link" id="step-help">✨ Ayuda con este paso</button>
+      <button type="button" class="btn btn-primary" id="next">Continuar</button>
+    </div>
+  </form>
+  </div>
+</div>
+<aside class="col-12 col-lg-5 col-xl-4"><div class="gb-card gb-sticky" aria-live="polite">
+  <div class="small text-secondary fw-bold text-uppercase mb-2">Resumen en vivo</div>
+  <dl class="gb-dl" style="grid-template-columns:5rem 1fr">
+    <dt>Emisor</dt><dd id="s-issuer">—</dd><dt>Receptor</dt><dd id="s-receiver">—</dd><dt>Fecha</dt><dd id="s-date">—</dd><dt>Líneas</dt><dd id="s-lines">—</dd>
+  </dl>
+  <div class="gb-cr mt-3" style="grid-template-columns:1fr">
+    <div class="it">Subtotal<b id="s-sub">₡0,00</b></div><div class="it">IVA<b id="s-tax">₡0,00</b></div><div class="it">Total<b id="s-total">₡0,00</b></div>
+  </div>
+  <ul class="gb-hist mt-3 mb-0" style="list-style:none;padding:0">
+    <li id="c-issuer">○ Emisor con identificación válida (9, 10 o 11–12 dígitos)</li>
+    <li id="c-receiver">○ Receptor con identificación válida</li>
+    <li id="c-lines">○ Al menos una línea con precio</li>
+  </ul>
+  <div class="small text-secondary mt-2">Al enviar, Hacienda recibe clave de 50 dígitos y XML v4.4.</div>
+</div></aside></div>{% endblock %}
+{% block scripts %}<script>
+const $ = (id) => document.getElementById(id);
+const steps = [...document.querySelectorAll(".step")];
+let cur = 0, created = null, editing = null;
+$("issue_date").value = new Date().toISOString().slice(0, 10);
+$("dots").innerHTML = steps.map(() => "<span></span>").join("");
+const money = (n) => "₡" + Number(n).toLocaleString("es-CR", { minimumFractionDigits: 2 });
+const csrf = () => document.querySelector("[name=csrfmiddlewaretoken]").value;
+
+function addLine(d = {}) {
+  const row = document.createElement("div");
+  row.className = "card p-3 mb-2 line";
+  row.innerHTML = `<input class="form-control mb-2 d" placeholder="Descripción" value="${d.description || ""}">
+    <div class="row g-2"><div class="col"><input class="form-control q" type="number" min="1" step="1" placeholder="Cantidad" value="${d.quantity || 1}"></div>
+    <div class="col"><input class="form-control p" type="number" min="0" step="0.01" placeholder="Precio con IVA" value="${d.unit_price || ""}"></div>
+    <div class="col"><select class="form-select t">${["13","4","2","1","0","exempt"].map(v => `<option value="${v}" ${v == (d.tax_rate || "13") ? "selected" : ""}>${v === "exempt" ? "Exento" : v + "%"}</option>`).join("")}</select></div></div>`;
+  $("lines").appendChild(row);
+}
+addLine();
+$("add-line").onclick = () => addLine();
+
+const favKey = (k) => "gb-favs-" + k;
+const loadFavs = (k) => { try { return JSON.parse(localStorage.getItem(favKey(k)) || "[]"); } catch { return []; } };
+function renderFavs(kind) {
+  const box = document.querySelector(`.gb-favs[data-kind="${kind}"]`);
+  const list = loadFavs(kind);
+  box.innerHTML = "";
+  list.forEach((f, i) => {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.title = f.id;
+    chip.innerHTML = "<span>★ </span><span></span><button type='button' aria-label='Quitar favorito'>✕</button>";
+    chip.children[1].textContent = f.name;
+    chip.onclick = () => { $(kind + "_name").value = f.name; $(kind + "_id").value = f.id; summary(); };
+    chip.querySelector("button").onclick = (e) => {
+      e.stopPropagation();
+      localStorage.setItem(favKey(kind), JSON.stringify(list.filter((_, j) => j !== i)));
+      renderFavs(kind);
+    };
+    box.appendChild(chip);
+  });
+  const add = document.createElement("button");
+  add.type = "button"; add.className = "btn btn-sm btn-outline-primary mb-1"; add.textContent = "★ Guardar como favorito";
+  add.onclick = () => {
+    const name = $(kind + "_name").value.trim(), id = $(kind + "_id").value.trim();
+    if (!name || !id) { $("err").textContent = "Escribe nombre e identificación para guardar el favorito."; $("err").hidden = false; return; }
+    $("err").hidden = true;
+    const rest = loadFavs(kind).filter((f) => f.id !== id);
+    localStorage.setItem(favKey(kind), JSON.stringify([{ name, id }, ...rest].slice(0, 12)));
+    renderFavs(kind);
+  };
+  const clear = document.createElement("button");
+  clear.type = "button"; clear.className = "btn btn-sm btn-link mb-1"; clear.textContent = "Dejar en blanco";
+  clear.onclick = () => { $(kind + "_name").value = ""; $(kind + "_id").value = ""; summary(); };
+  box.append(add, clear);
+}
+renderFavs("issuer"); renderFavs("receiver");
+$("blank-btn").onclick = () => { window.location.href = window.location.pathname; };
+
+const body = () => ({
+  client_id: crypto.randomUUID(),
+  issuer_name: $("issuer_name").value.trim(), issuer_id: $("issuer_id").value.trim(),
+  receiver_name: $("receiver_name").value.trim(), receiver_id: $("receiver_id").value.trim(),
+  issue_date: $("issue_date").value,
+  lines: [...document.querySelectorAll(".line")].map(r => ({
+    description: r.querySelector(".d").value.trim(), quantity: r.querySelector(".q").value,
+    unit_price: r.querySelector(".p").value, tax_rate: r.querySelector(".t").value })),
+});
+async function api(path, payload, method = "POST") {
+  const res = await fetch(path, { method, credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() }, body: JSON.stringify(payload) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(JSON.stringify(data));
+  return data;
+}
+function show() {
+  steps.forEach((s, i) => s.classList.toggle("on", i === cur));
+  [...$("dots").children].forEach((d, i) => d.classList.toggle("on", i <= cur));
+  $("back").style.visibility = cur ? "visible" : "hidden";
+  $("next").style.display = cur === steps.length - 1 ? "none" : "";
+  $("err").hidden = true;
+}
+function validate() {
+  const b = body();
+  if (cur === 0 && (!b.issuer_name || !b.issuer_id)) return "Completa los datos del emisor.";
+  if (cur === 1 && (!b.receiver_name || !b.receiver_id || !b.issue_date)) return "Completa los datos del receptor.";
+  if (cur === 2 && b.lines.some(l => !l.description || !(+l.quantity > 0) || !(+l.unit_price >= 0) || l.unit_price === "")) return "Cada línea necesita descripción, cantidad y precio.";
+  return "";
+}
+async function review() {
+  $("cost").textContent = "Calculando…"; $("ai-text").textContent = "";
+  try {
+    const d = await api("/api/v1/ai/review-draft/", { ...body(), use_ai: false });
+    const c = d.cost || {};
+    $("cost").textContent = `Subtotal ${money(c.subtotal)} + IVA ${money(c.tax)} = ${money(c.total)}`;
+  } catch (e) { $("cost").textContent = "No se pudo calcular: " + e.message; }
+}
+$("ai-btn").onclick = async () => {
+  $("ai-text").textContent = "Analizando con IA local…";
+  try { const d = await api("/api/v1/ai/review-draft/", body()); $("ai-text").textContent = d.advice || d.analysis || ""; }
+  catch (e) { $("ai-text").textContent = "IA no disponible: " + e.message; }
+};
+$("next").onclick = () => {
+  const m = validate();
+  if (m) { $("err").textContent = m; $("err").hidden = false; return; }
+  cur++; show(); if (cur === 3) review();
+};
+$("back").onclick = () => { cur = Math.max(0, cur - 1); show(); };
+
+async function create(send) {
+  $("result").innerHTML = "Procesando…";
+  try {
+    if (!created) created = editing
+      ? await api(`/api/v1/invoices/${editing.id}/`, { ...body(), version: editing.version }, "PUT")
+      : await api("/api/v1/invoices/", body());
+    $("payload").hidden = false; $("payload").textContent = JSON.stringify(created, null, 2);
+    let msg = `Factura ${editing ? "actualizada (vuelve a borrador)" : "creada"} · total ${money(created.total)}.`;
+    if (send) {
+      created = await api(`/api/v1/invoices/${created.id}/transition/`, { to: "ready", version: created.version });
+      await api(`/api/v1/invoices/${created.id}/submit/`, {});
+      msg += " Enviada a Hacienda; revisa el resultado en Mis facturas.";
+    }
+    $("result").innerHTML = `<div class="alert alert-success">${msg} <a href="{% url 'issued_invoice_list' %}">Ver facturas</a></div>`;
+  } catch (e) { $("result").innerHTML = `<div class="alert alert-danger"></div>`; $("result").firstChild.textContent = e.message; }
+}
+$("save-btn").onclick = () => create(false);
+$("send-btn").onclick = () => create(true);
+function summary() {
+  const b = body(); let total = 0, tax = 0;
+  b.lines.forEach(l => { const g = (+l.quantity || 0) * (+l.unit_price || 0); const r = l.tax_rate === "exempt" ? 0 : +l.tax_rate; total += g; tax += g * r / (100 + r); });
+  $("s-issuer").textContent = b.issuer_name ? `${b.issuer_name} · ${b.issuer_id}` : "—";
+  $("s-receiver").textContent = b.receiver_name ? `${b.receiver_name} · ${b.receiver_id}` : "—";
+  $("s-date").textContent = b.issue_date ? b.issue_date.split("-").reverse().join("/") : "—";
+  $("s-lines").textContent = b.lines.length;
+  $("s-sub").textContent = money(total - tax); $("s-tax").textContent = money(tax); $("s-total").textContent = money(total);
+  const okId = (v) => [9, 10, 11, 12].includes(v.replace(/\D/g, "").length) && /^\d+$/.test(v);
+  const mark = (id, ok, text) => { $(id).textContent = (ok ? "✔ " : "○ ") + text; $(id).style.color = ok ? "#12a150" : ""; };
+  mark("c-issuer", okId(b.issuer_id), "Emisor con identificación válida (9, 10 o 11–12 dígitos)");
+  mark("c-receiver", okId(b.receiver_id), "Receptor con identificación válida");
+  mark("c-lines", b.lines.length > 0 && b.lines.every(l => l.description && l.unit_price !== "" && +l.unit_price >= 0), "Líneas completas con precio");
+}
+$("wiz").addEventListener("input", summary); $("wiz").addEventListener("change", summary);
+$("add-line").addEventListener("click", summary);
+const STEP_Q = ["¿Qué datos necesito del emisor?", "¿Qué datos necesito del receptor y qué fecha pongo?", "¿Cómo registro las líneas y qué tarifa de IVA uso?", "¿Está bien mi total?", "¿Qué pasa si creo o envío la factura?"];
+$("step-help").onclick = () => window.gbAsk(STEP_Q[cur] || "Guíame");
+window.gbAiExtra = () => { const b = body(); return `Paso ${cur + 1} de 5. Emisor: ${b.issuer_name} ${b.issuer_id}. Receptor: ${b.receiver_name} ${b.receiver_id}. Fecha ${b.issue_date}. Líneas: ` + b.lines.map(l => `${l.description} x${l.quantity} a ${l.unit_price} (${l.tax_rate})`).join("; "); };
+
+async function loadEditing(id) {
+  try {
+    const res = await fetch(`/api/v1/invoices/${id}/`, { credentials: "same-origin" });
+    if (!res.ok) throw new Error("No se encontró la factura.");
+    const inv = await res.json();
+    if (!["draft", "rejected"].includes(inv.status)) { $("err").textContent = "Solo se editan borradores o facturas rechazadas."; $("err").hidden = false; return; }
+    editing = inv; const d = inv.document;
+    $("issuer_name").value = d.issuer.name; $("issuer_id").value = d.issuer.identification;
+    $("receiver_name").value = d.receiver.name; $("receiver_id").value = d.receiver.identification;
+    $("issue_date").value = inv.issue_date; $("lines").innerHTML = "";
+    d.lines.forEach(l => addLine({ description: l.description, quantity: parseFloat(l.quantity), unit_price: l.unit_price_including_tax, tax_rate: l.tax_treatment === "exempt" ? "exempt" : l.tax_rate }));
+    $("edit-banner").hidden = false;
+    $("edit-title").textContent = inv.status === "rejected" ? "Corrigiendo factura rechazada por Hacienda" : "Editando borrador";
+    $("edit-msg").textContent = inv.hacienda_message || "Al guardar se actualizará la misma factura.";
+    $("edit-ai").onclick = async () => {
+      $("edit-ai-out").textContent = "Analizando con IA local…";
+      try { const r = await api(`/api/v1/invoices/${inv.id}/ai-fix/`, {}); $("edit-ai-out").textContent = (r.ai_used ? "" : "(IA no disponible; guía básica)\n") + r.guidance; }
+      catch (e) { $("edit-ai-out").textContent = e.message; }
+    };
+    summary();
+  } catch (e) { $("err").textContent = e.message; $("err").hidden = false; }
+}
+const editId = new URLSearchParams(location.search).get("editar");
+if (editId) loadEditing(editId);
+summary(); show();
+</script>{% endblock %}

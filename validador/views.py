@@ -60,10 +60,10 @@ INVOICE_BATCH_TTL_SECONDS = 600
 
 def login_view(request):
     if not settings.DEBUG or not settings.DEMO_LOGIN_ENABLED:
-        return HttpResponseNotFound("El inicio de sesión de demostración está desactivado.")
+        return HttpResponseNotFound("El acceso de prueba está desactivado.")
 
     if request.user.is_authenticated:
-        return redirect("index")
+        return redirect("dashboard")
 
     context = {"demo_username": settings.DEMO_USERNAME}
     if request.method == "POST":
@@ -78,7 +78,7 @@ def login_view(request):
                 defaults={"is_staff": False, "is_superuser": False},
             )
             if not user.is_active or user.is_staff or user.is_superuser:
-                context["error"] = "La cuenta de demostración no está habilitada."
+                context["error"] = "La cuenta de prueba no está habilitada."
                 return render(request, "validador/login.html", context, status=403)
             if not user.has_usable_password():
                 user.set_unusable_password()
@@ -97,7 +97,7 @@ def login_view(request):
                 next_url, allowed_hosts={request.get_host()}
             ):
                 return redirect(next_url)
-            return redirect("index")
+            return redirect("dashboard")
         context["error"] = "Usuario o contraseña incorrectos."
         return render(request, "validador/login.html", context, status=401)
 
@@ -178,7 +178,7 @@ def _redirect_after_design_save(request):
         next_url, allowed_hosts={request.get_host()}
     ):
         return redirect(next_url)
-    return redirect("index")
+    return redirect("dashboard")
 
 
 def logout_view(request):
@@ -592,7 +592,7 @@ def _invoice_month_dashboard(batch):
 
 @login_required
 def download_sample_invoices(request):
-    sample_path = settings.BASE_DIR / "ejemplo_facturas_octubre.csv"
+    sample_path = settings.BASE_DIR / "samples" / "ejemplo_facturas_octubre.csv"
     try:
         content = sample_path.read_bytes()
     except OSError as exc:
@@ -1175,3 +1175,39 @@ def download_report(request, report_id):
     response = HttpResponse(report, content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = 'attachment; filename="reporte_validacion.csv"'
     return response
+
+
+@login_required
+def mobile_capture(request):
+    return render(request, "validador/mobile_capture.html")
+
+
+@login_required
+def issued_invoice_list(request):
+    return render(request, "validador/issued_invoice_list.html")
+
+
+@login_required
+def invoice_wizard(request):
+    return render(request, "validador/invoice_wizard.html")
+
+
+@login_required
+def integrations(request):
+    from .models import ApiKey
+
+    new_key = None
+    if request.method == "POST":
+        if request.POST.get("action") == "revoke":
+            ApiKey.objects.filter(
+                owner=request.user, pk=request.POST.get("key_id"), revoked_at__isnull=True
+            ).update(revoked_at=timezone.now())
+        else:
+            name = (request.POST.get("name") or "Mi sistema").strip()
+            _, new_key = ApiKey.issue(request.user, name)
+    context = {
+        "keys": ApiKey.objects.filter(owner=request.user),
+        "new_key": new_key,
+        "base_url": request.build_absolute_uri("/").rstrip("/"),
+    }
+    return render(request, "validador/integrations.html", context)

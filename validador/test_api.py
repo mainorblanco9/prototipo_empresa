@@ -5,6 +5,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework.test import APIClient
 
+from . import hacienda
 from .models import IssuedInvoice
 
 
@@ -246,3 +247,456 @@ class IssuedInvoiceApiTests(TestCase):
             reverse("api_invoice_summary"), {"month": "2026-10"}
         ).json()
         self.assertEqual(october_summary["totals"]["total"], "2260.00")
+
+
+class HaciendaFlowTests(TestCase):
+    def setUp(self):
+        user = get_user_model().objects.create_user("hacienda-user", password="Clave-segura-1")
+        self.client = APIClient()
+        self.client.force_authenticate(user)
+        response = self.client.post(reverse("api_invoice_list"), payload(), format="json")
+        self.invoice = response.json()
+
+    def transition(self, to):
+        invoice = self.client.get(reverse("api_invoice_detail", args=[self.invoice["id"]])).json()
+        return self.client.post(
+            reverse("api_invoice_transition", args=[invoice["id"]]),
+            {"to": to, "version": invoice["version"]},
+            format="json",
+        )
+
+    def queue(self):
+        invoice = self.client.get(reverse("api_invoice_detail", args=[self.invoice["id"]])).json()
+        return self.client.post(
+            reverse("api_invoice_queue", args=[invoice["id"]]),
+            {"version": invoice["version"]},
+            format="json",
+        )
+
+    def test_hacienda_states_cannot_be_set_manually(self):
+        self.transition("ready")
+        self.assertEqual(self.transition("accepted").status_code, 400)
+
+    def test_draft_cannot_be_queued(self):
+        self.assertEqual(self.queue().status_code, 409)
+
+    def test_queue_generates_50_digit_clave_and_payload(self):
+        self.transition("ready")
+        queued = self.queue()
+        self.assertEqual(queued.status_code, 200)
+        data = queued.json()
+        self.assertEqual(data["status"], "queued")
+        self.assertRegex(data["clave"], r"^506\d{47}$")
+        self.assertEqual(data["clave"][3:9], "031026")
+        self.assertEqual(data["clave"][9:21], "003101000000")
+        payload_response = self.client.get(
+            reverse("api_invoice_reception_payload", args=[data["id"]])
+        ).json()
+        self.assertEqual(payload_response["clave"], data["clave"])
+        import base64
+
+        xml = base64.b64decode(payload_response["comprobanteXml"]).decode()
+        self.assertIn("<Clave>" + data["clave"] + "</Clave>", xml)
+        self.assertIn("FacturaElectronica", xml)
+
+    def test_consecutive_increments(self):
+        self.transition("ready")
+        first = self.queue().json()
+        second_draft = self.client.post(
+            reverse("api_invoice_list"), payload(), format="json"
+        ).json()
+        self.client.post(
+            reverse("api_invoice_transition", args=[second_draft["id"]]),
+            {"to": "ready", "version": second_draft["version"]},
+            format="json",
+        )
+        refreshed = self.client.get(
+            reverse("api_invoice_detail", args=[second_draft["id"]])
+        ).json()
+        second = self.client.post(
+            reverse("api_invoice_queue", args=[second_draft["id"]]),
+            {"version": refreshed["version"]},
+            format="json",
+        ).json()
+        self.assertNotEqual(first["clave"], second["clave"])
+        self.assertEqual(first["clave"][21:41][-10:], "0000000001")
+        self.assertEqual(second["clave"][21:41][-10:], "0000000002")
+
+    def test_hacienda_result_updates_status(self):
+        self.transition("ready")
+        data = self.queue().json()
+        url = reverse("api_invoice_hacienda_result", args=[data["id"]])
+        processing = self.client.post(url, {"state": "procesando"}, format="json")
+        self.assertEqual(processing.json()["status"], "processing")
+        accepted = self.client.post(
+            url, {"state": "aceptado", "message": "OK"}, format="json"
+        )
+        self.assertEqual(accepted.json()["status"], "accepted")
+        self.assertEqual(accepted.json()["hacienda_message"], "OK")
+        again = self.client.post(url, {"state": "rechazado"}, format="json")
+        self.assertEqual(again.status_code, 409)
+
+    def test_rejected_can_return_to_draft(self):
+        self.transition("ready")
+        data = self.queue().json()
+        self.client.post(
+            reverse("api_invoice_hacienda_result", args=[data["id"]]),
+            {"state": "rechazado", "message": "Error"},
+            format="json",
+        )
+        self.assertEqual(self.transition("draft").status_code, 200)
+
+    def test_pages_render_for_logged_user(self):
+        from django.test import Client
+
+        web = Client()
+        web.force_login(get_user_model().objects.get(username="hacienda-user"))
+        self.assertEqual(web.get(reverse("mobile_capture")).status_code, 200)
+        self.assertEqual(web.get(reverse("issued_invoice_list")).status_code, 200)
+        self.assertIn("/facturas/movil/", web.get(reverse("pwa_service_worker")).content.decode())
+
+
+class RejectedFlowTests(HaciendaFlowTests):
+    def _reject(self):
+        self.transition("ready")
+        data = self.queue().json()
+        self.client.post(reverse("api_invoice_hacienda_result", args=[data["id"]]),
+                         {"state": "rechazado", "message": "[-37] Error"}, format="json")
+
+    def test_edit_rejected_resets_to_draft(self):
+        self._reject()
+        inv = self.client.get(reverse("api_invoice_detail", args=[self.invoice["id"]])).json()
+        body = payload()
+        body["version"] = inv["version"]
+        res = self.client.put(reverse("api_invoice_detail", args=[inv["id"]]), body, format="json")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()["status"], "draft")
+        self.assertEqual(res.json()["clave"], "")
+
+    def test_rejected_can_be_cancelled(self):
+        self._reject()
+        self.assertEqual(self.transition("cancelled").status_code, 200)
+
+    def test_ai_fix_and_assistant_fallback(self):
+        from unittest import mock
+        from .ai_assist import AIProviderError
+
+        self._reject()
+        with mock.patch("validador.ai_assist.generate_local_text", side_effect=AIProviderError("off")):
+            res = self.client.post(reverse("api_invoice_ai_fix", args=[self.invoice["id"]]), {}, format="json")
+            self.assertEqual(res.status_code, 200)
+            self.assertFalse(res.json()["ai_used"])
+            self.assertTrue(res.json()["guidance"])
+            res = self.client.post(reverse("api_ai_assistant"), {"context": "cierre", "question": "?"}, format="json")
+            self.assertEqual(res.status_code, 200)
+            self.assertTrue(res.json()["answer"])
+
+    def test_fix_period_cancels_rejected_and_closes(self):
+        from . import periods
+        from .models import IssuedInvoice
+
+        self._reject()
+        owner = IssuedInvoice.objects.get().owner
+        period = IssuedInvoice.objects.get().issue_date.strftime("%Y-%m")
+        out = periods.fix_period(owner, period, "cancel_rejected", owner)
+        self.assertEqual(out["changed"], 1)
+        self.assertEqual(IssuedInvoice.objects.get().status, "cancelled")
+
+    def test_cancel_pending_unblocks_close(self):
+        from . import periods
+        from .models import IssuedInvoice
+
+        owner = IssuedInvoice.objects.get().owner
+        period = IssuedInvoice.objects.get().issue_date.strftime("%Y-%m")
+        self.assertFalse(periods.validate_period(owner, period)["can_close"])
+        periods.fix_period(owner, period, "cancel_pending", owner)
+        self.assertEqual(IssuedInvoice.objects.get().status, "cancelled")
+
+
+class AiAssistTests(HaciendaFlowTests):
+    def test_review_draft_returns_exact_cost_and_ai_advice(self):
+        from unittest import mock
+
+        with mock.patch("validador.ai_assist.generate_local_text", return_value="Sugerencia"):
+            response = self.client.post(
+                reverse("api_ai_review_draft"),
+                {k: v for k, v in payload().items() if k != "client_id"},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["cost"]["total"], "2260.00")
+        self.assertEqual(data["advice"], "Sugerencia")
+
+    def test_review_draft_degrades_without_ollama(self):
+        from unittest import mock
+
+        from .ai_client import AIProviderError
+
+        with mock.patch("validador.ai_assist.generate_local_text", side_effect=AIProviderError("sin ollama")):
+            data = self.client.post(
+                reverse("api_ai_review_draft"),
+                {k: v for k, v in payload().items() if k != "client_id"},
+                format="json",
+            ).json()
+        self.assertFalse(data["ai_available"])
+        self.assertEqual(data["cost"]["total"], "2260.00")
+
+    def test_hacienda_analysis_saved_and_fallback(self):
+        from unittest import mock
+
+        from .ai_client import AIProviderError
+
+        self.transition("ready")
+        data = self.queue().json()
+        url = reverse("api_invoice_ai_analysis", args=[data["id"]])
+        self.client.post(
+            reverse("api_invoice_hacienda_result", args=[data["id"]]),
+            {"state": "rechazado", "message": "Error en receptor"},
+            format="json",
+        )
+        with mock.patch("validador.ai_assist.generate_local_text", side_effect=AIProviderError("x")):
+            result = self.client.post(url).json()
+        self.assertFalse(result["ai_used"])
+        self.assertIn("rechazó", result["analysis"])
+        with mock.patch("validador.ai_assist.generate_local_text", return_value="Causa: receptor"):
+            self.assertTrue(self.client.post(url).json()["ai_used"])
+        detail = self.client.get(reverse("api_invoice_detail", args=[data["id"]])).json()
+        self.assertEqual(detail["ai_analysis"], "Causa: receptor")
+
+
+class ApiKeyTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("prov", password="x-Pass-123")
+
+    def _payload(self):
+        return {
+            "client_id": str(uuid.uuid4()),
+            "issuer_name": "Emisor", "issuer_id": "3101123456",
+            "receiver_name": "Receptor", "receiver_id": "3101654321",
+            "issue_date": "2026-01-15",
+            "lines": [{"description": "Servicio", "quantity": 1, "unit_price": "113", "tax_rate": "13"}],
+        }
+
+    def test_api_key_creates_invoice_with_bearer_and_header(self):
+        from .models import ApiKey
+
+        key, raw = ApiKey.issue(self.user, "ERP")
+        self.assertNotIn(raw, key.key_hash)
+        client = APIClient()
+        res = client.post("/api/v1/invoices/", self._payload(), format="json", HTTP_AUTHORIZATION=f"Bearer {raw}")
+        self.assertEqual(res.status_code, 201, res.content)
+        res = client.get("/api/v1/invoices/", HTTP_X_API_KEY=raw)
+        self.assertEqual(res.status_code, 200)
+        key.refresh_from_db()
+        self.assertIsNotNone(key.last_used_at)
+
+    def test_invalid_or_revoked_key_is_rejected(self):
+        from django.utils import timezone
+
+        from .models import ApiKey
+
+        client = APIClient()
+        self.assertEqual(client.get("/api/v1/invoices/", HTTP_X_API_KEY="gb_nope").status_code, 401)
+        key, raw = ApiKey.issue(self.user, "ERP")
+        key.revoked_at = timezone.now()
+        key.save()
+        self.assertEqual(client.get("/api/v1/invoices/", HTTP_X_API_KEY=raw).status_code, 401)
+
+    def test_integrations_page_issues_key_once_and_wizard_renders(self):
+        self.client.force_login(self.user)
+        res = self.client.post(reverse("integrations"), {"name": "Mi ERP"})
+        self.assertContains(res, "gb_")
+        self.assertEqual(self.user.api_keys.count(), 1)
+        self.assertNotContains(self.client.get(reverse("integrations")), "no se vuelve a mostrar")
+        self.assertContains(self.client.get(reverse("invoice_wizard")), "GuanaBill")
+
+    def test_review_draft_without_ai_returns_cost_only(self):
+        self.client.force_login(self.user)
+        res = self.client.post("/api/v1/ai/review-draft/", {**self._payload(), "use_ai": False}, content_type="application/json")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.json()["cost"]["total"], "113.00")
+
+    def test_seed_command(self):
+        from django.core.management import call_command
+
+        call_command("seed_guanabill", stdout=__import__("io").StringIO())
+        self.assertEqual(IssuedInvoice.objects.filter(owner__username="proveedor_prueba").count(), 3)
+
+
+class PeriodAndActivityTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("cierre", password="x-Pass-123")
+        self.client.force_login(self.user)
+
+    def _invoice(self, status, day="2026-01-15", n=1):
+        from .models import IssuedInvoiceStatusEvent
+
+        doc = {"issue_date": day, "receiver": {"name": "Cliente"}, "totals": {"subtotal": "100", "tax": "13", "total": "113"}}
+        inv = IssuedInvoice.objects.create(
+            owner=self.user, client_id=uuid.uuid4(), status=status, issue_date=day,
+            receiver_name="Cliente", subtotal=100, tax_total=13, total=113, document=doc, consecutive=n,
+            clave=f"{n:050d}",
+        )
+        IssuedInvoiceStatusEvent.objects.create(invoice=inv, from_status="", to_status=status, actor=self.user)
+        return inv
+
+    def test_close_blocked_by_draft_and_rejected_then_closed(self):
+        from .models import PeriodClosure
+
+        self._invoice("draft", n=1)
+        rej = self._invoice("rejected", n=2)
+        res = self.client.post(reverse("closures"), {"period": "2026-01", "action": "close"})
+        self.assertContains(res, "No se pudo cerrar")
+        self.assertEqual(PeriodClosure.objects.get().result, "blocked")
+        IssuedInvoice.objects.filter(status="draft").update(status="accepted")
+        rej.status = "accepted"
+        rej.save()
+        res = self.client.post(reverse("closures"), {"period": "2026-01", "action": "close"})
+        self.assertContains(res, "cerrado")
+        self.assertEqual(PeriodClosure.objects.first().result, "closed")
+
+    def test_closed_period_rejects_new_invoices_until_reopened(self):
+        self._invoice("accepted")
+        self.client.post(reverse("closures"), {"period": "2026-01", "action": "close"})
+        payload = {
+            "client_id": str(uuid.uuid4()), "issuer_name": "E", "issuer_id": "1", "receiver_name": "R",
+            "receiver_id": "2", "issue_date": "2026-01-20",
+            "lines": [{"description": "x", "quantity": 1, "unit_price": "113", "tax_rate": "13"}],
+        }
+        self.assertEqual(self.client.post("/api/v1/invoices/", payload, content_type="application/json").status_code, 409)
+        self.client.post(reverse("closures"), {"period": "2026-01", "action": "reopen", "note": "ajuste"})
+        payload["client_id"] = str(uuid.uuid4())
+        self.assertEqual(self.client.post("/api/v1/invoices/", payload, content_type="application/json").status_code, 201)
+
+    def test_activity_log_filters_and_csv(self):
+        self._invoice("accepted", n=1)
+        self._invoice("rejected", n=2)
+        self.client.post(reverse("closures"), {"period": "2026-01", "action": "close"})
+        res = self.client.get(reverse("activity_log"), {"resultado": "rechazados"})
+        self.assertContains(res, "Rechazada por Hacienda")
+        self.assertNotContains(res, "Aceptada por Hacienda")
+        res = self.client.get(reverse("activity_log"), {"tipo": "cierres", "formato": "csv"})
+        self.assertIn("Cierre rechazado", res.content.decode("utf-8-sig"))
+
+    def test_dashboard_and_pages_render_without_demo_wording(self):
+        for name in ("dashboard", "issued_invoice_list", "invoice_wizard", "import_invoices", "closures", "integrations", "activity_log"):
+            body = self.client.get(reverse(name)).content.decode()
+            self.assertNotIn("Demo gen", body)
+            self.assertNotIn("emostraci", body)
+            self.assertNotIn("rototipo", body)
+
+    def test_excel_import_validates_then_creates_idempotently(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        csv_text = (
+            "factura,emisor,cedula_emisor,receptor,cedula_receptor,fecha,descripcion,cantidad,precio_con_iva,iva\n"
+            "F1,Emisor,3101,Cliente,3102,2026-01-10,Servicio,1,113,13\n"
+            "F1,Emisor,3101,Cliente,3102,2026-01-10,Otro,2,50,exempt\n"
+            "F2,Emisor,3101,Cliente,3102,fecha-mala,Servicio,1,113,13\n"
+        )
+        def upload(confirm):
+            f = SimpleUploadedFile("lote.csv", csv_text.encode(), content_type="text/csv")
+            return self.client.post("/api/v1/invoices/import/", {"file": f, **({"confirm": "1"} if confirm else {})}).json()
+        preview = upload(False)
+        self.assertEqual((preview["valid"], preview["with_errors"], preview["created"]), (1, 1, 0))
+        self.assertEqual(IssuedInvoice.objects.count(), 0)
+        self.assertEqual(upload(True)["created"], 1)
+        self.assertEqual(upload(True)["created"], 0)
+        self.assertEqual(IssuedInvoice.objects.count(), 1)
+        self.assertEqual(IssuedInvoice.objects.get().total, 213)
+        self.assertContains(self.client.get(reverse("import_template")), "factura,emisor")
+
+
+class LocalValidationAndThemeTests(HaciendaFlowTests):
+    def test_validate_reports_bad_issuer_without_sending(self):
+        bad = self.client.post(
+            reverse("api_invoice_list"), payload(issuer_id="1", client_id=str(uuid.uuid4())), format="json"
+        ).json()
+        result = self.client.post(reverse("api_invoice_validate", args=[bad["id"]])).json()
+        self.assertFalse(result["valid"])
+        self.assertIn("emisor", result["issues"][0]["message"])
+        good = self.client.post(reverse("api_invoice_validate", args=[self.invoice["id"]])).json()
+        self.assertTrue(good["valid"])
+
+    def test_queue_blocks_invalid_issuer_with_422(self):
+        bad = self.client.post(
+            reverse("api_invoice_list"), payload(issuer_id="1", client_id=str(uuid.uuid4())), format="json"
+        ).json()
+        self.client.post(
+            reverse("api_invoice_transition", args=[bad["id"]]), {"to": "ready", "version": bad["version"]}, format="json"
+        )
+        current = self.client.get(reverse("api_invoice_detail", args=[bad["id"]])).json()
+        response = self.client.post(
+            reverse("api_invoice_queue", args=[bad["id"]]), {"version": current["version"]}, format="json"
+        )
+        self.assertEqual(response.status_code, 422)
+
+    def test_theme_save_and_recommend(self):
+        user = get_user_model().objects.get(username="hacienda-user")
+        web = self.client_class()
+        web.force_login(user)
+        url = reverse("api_design_theme")
+        ok = web.post(url, {"action": "save", "theme": "ocean"}, content_type="application/json")
+        self.assertEqual(ok.json()["theme"], "ocean")
+        self.assertEqual(web.post(url, {"action": "save", "theme": "x"}, content_type="application/json").status_code, 400)
+        with override_settings(AI_PROVIDER="none"):
+            rec = web.post(url, {"action": "recommend", "description": "algo oscuro de noche"}, content_type="application/json").json()
+        self.assertFalse(rec["ai_used"])
+        self.assertEqual(rec["suggestions"][0]["theme"], "midnight")
+        self.assertContains(web.get(reverse("dashboard")), 'data-theme="ocean"')
+
+class SeedBancosTests(TestCase):
+    def test_seed_bancos_creates_varied_invoices(self):
+        from django.core.management import call_command
+        call_command("seed_bancos", "--user", "tester", "--count", "14", stdout=__import__("io").StringIO())
+        invoices = IssuedInvoice.objects.filter(owner__username="tester")
+        self.assertEqual(invoices.count(), 14)
+        self.assertTrue(invoices.filter(status="ready").exists())
+        self.assertGreater(len({i.issue_date.strftime("%Y-%m") for i in invoices}), 1)
+
+class HaciendaFlowPageTests(TestCase):
+    def test_flow_page_renders_stages(self):
+        user = get_user_model().objects.create_user("flow", password="x-Pass-12345")
+        self.client.force_login(user)
+        response = self.client.get(reverse("hacienda_flow"))
+        self.assertContains(response, "Firma XAdES-EPES")
+        self.assertContains(response, "/recepcion/v1/recepcion")
+
+
+class SampleWorkbookAndOpenApiTests(HaciendaFlowTests):
+    def _upload(self, name, confirm=False):
+        from pathlib import Path
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        raw = (Path(__file__).resolve().parent.parent / "samples" / name).read_bytes()
+        f = SimpleUploadedFile(name, raw, content_type="application/octet-stream")
+        return self.client.post("/api/v1/invoices/import/", {"file": f, **({"confirm": "1"} if confirm else {})}).json()
+
+    def test_valid_sample_workbook_imports_and_passes_local_validation(self):
+        result = self._upload("guanabill_facturas_validas.xlsx", confirm=True)
+        self.assertEqual(result["with_errors"], 0, result)
+        self.assertEqual(result["created"], 25)
+        for invoice in IssuedInvoice.objects.exclude(client_id=self.invoice["client_id"]):
+            self.assertEqual(hacienda.validate_invoice(invoice), [], invoice.document["issuer"])
+
+    def test_full_sample_workbook_reports_expected_errors(self):
+        result = self._upload("guanabill_facturas_todo_tipo.xlsx")
+        self.assertEqual(result["with_errors"], 6, result)
+        self.assertEqual(result["valid"], 25 + 1 + 2)
+
+    def test_openapi_spec_is_valid_and_docs_require_login(self):
+        try:
+            from openapi_spec_validator import validate
+        except ImportError:
+            self.skipTest('Instala requirements-dev.txt')
+
+        anon = self.client_class()
+        spec = anon.get("/api/v1/openapi.json").json()
+        validate(spec)
+        self.assertIn("/api/v1/invoices/{id}/submit/", spec["paths"])
+        self.assertEqual(anon.get("/api/docs/").status_code, 302)
+        web = self.client_class()
+        web.force_login(get_user_model().objects.get(username="hacienda-user"))
+        self.assertContains(web.get("/api/docs/"), "swagger")
