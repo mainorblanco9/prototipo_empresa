@@ -596,3 +596,11 @@ class SeedBancosTests(TestCase):
         self.assertEqual(invoices.count(), 14)
         self.assertTrue(invoices.filter(status="ready").exists())
         self.assertGreater(len({i.issue_date.strftime("%Y-%m") for i in invoices}), 1)
+
+class HaciendaFlowPageTests(TestCase):
+    def test_flow_page_renders_stages(self):
+        user = get_user_model().objects.create_user("flow", password="x-Pass-12345")
+        self.client.force_login(user)
+        response = self.client.get(reverse("hacienda_flow"))
+        self.assertContains(response, "Firma XAdES-EPES")
+        self.assertContains(response, "/recepcion/v1/recepcion")

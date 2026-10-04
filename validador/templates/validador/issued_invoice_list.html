@@ -14,15 +14,36 @@
       <a class="btn btn-outline-primary" href="{% url 'invoice_wizard' %}">＋</a></div>
   </div>
 </div>
-<div id="msg" class="alert alert-warning" hidden role="status"></div>
-<div class="gb-card mb-3" id="ai" hidden><strong>Análisis de la respuesta de Hacienda (IA local)</strong><pre id="ai-text" style="white-space:pre-wrap;font:inherit;margin:.5rem 0 0"></pre></div>
-<div class="gb-card">
-  <div class="table-responsive"><table class="table gb-table mb-0">
-    <thead><tr><th>Fecha</th><th>Receptor</th><th class="text-end">Total ₡</th><th>Estado</th><th>Clave / mensaje</th><th></th></tr></thead>
-    <tbody id="rows"></tbody>
-  </table></div>
-  <div class="d-flex justify-content-between align-items-center mt-3"><span class="small text-secondary" id="count"></span>
-    <button class="btn btn-outline-primary btn-sm" id="more" type="button" hidden>Cargar más</button></div>
+<div id="msg" class="alert alert-warning py-2" hidden role="status"></div>
+<div class="row g-3 gb-split">
+  <div class="col-xl-8">
+    <div class="gb-card gb-fill">
+      <div class="gb-scroll"><table class="table gb-table table-hover mb-0">
+        <thead><tr><th>Fecha</th><th>Receptor</th><th class="text-end">Total ₡</th><th>Estado</th><th>Clave / mensaje</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table></div>
+      <div class="d-flex justify-content-between align-items-center pt-2"><span class="small text-secondary" id="count"></span>
+        <button class="btn btn-outline-primary btn-sm" id="more" type="button" hidden>Cargar más</button></div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <aside class="gb-card gb-fill" id="detail" aria-live="polite">
+      <div class="text-secondary" id="detail-empty">Selecciona una factura para ver emisor, receptor, líneas, historial y el análisis de la respuesta de Hacienda.</div>
+      <div id="detail-body" hidden>
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div><div class="small text-secondary fw-bold text-uppercase">Factura electrónica</div><div class="fs-5 fw-bold" id="d-total"></div></div>
+          <span class="gb-badge" id="d-status"></span>
+        </div>
+        <dl class="gb-dl mt-2">
+          <dt>Emisor</dt><dd id="d-issuer"></dd><dt>Receptor</dt><dd id="d-receiver"></dd>
+          <dt>Fecha</dt><dd id="d-date"></dd><dt>Clave</dt><dd id="d-clave" class="font-monospace small"></dd>
+        </dl>
+        <table class="table table-sm gb-table"><thead><tr><th>Detalle</th><th class="text-end">Cant.</th><th class="text-end">IVA</th><th class="text-end">Total</th></tr></thead><tbody id="d-lines"></tbody></table>
+        <div class="small text-secondary fw-bold text-uppercase mt-2">Historial</div><ol class="gb-hist" id="d-hist"></ol>
+        <div id="ai" hidden class="gb-aibox"><strong>✨ Análisis de la respuesta de Hacienda</strong><pre id="ai-text"></pre></div>
+      </div>
+    </aside>
+  </div>
 </div>
 {% endblock %}
 {% block scripts %}
@@ -42,9 +63,22 @@
   };
   const note = (t) => { $("msg").hidden = !t; $("msg").textContent = t || ""; };
   const cell = (tr, text, cls) => { const td = tr.insertCell(); td.textContent = text; if (cls) td.className = cls; return td; };
-  let nextUrl = null, items = [];
+  let nextUrl = null, items = [], selected = null;
+  const money = (v) => Number(v).toLocaleString("es-CR", { minimumFractionDigits: 2 });
+  async function show(inv) {
+    selected = inv.id; $("detail-empty").hidden = true; $("detail-body").hidden = false; $("ai").hidden = true;
+    const [full, hist] = await Promise.all([api(`/api/v1/invoices/${inv.id}/`), api(`/api/v1/invoices/${inv.id}/history/`)]);
+    const doc = full.document;
+    $("d-total").textContent = "₡" + money(full.total); const st = $("d-status"); st.className = "gb-badge " + full.status; st.textContent = full.status_label;
+    $("d-issuer").textContent = `${doc.issuer.name} · ${doc.issuer.identification}`; $("d-receiver").textContent = `${doc.receiver.name} · ${doc.receiver.identification}`;
+    $("d-date").textContent = full.issue_date.split("-").reverse().join("/"); $("d-clave").textContent = full.clave || "Aún sin clave (se asigna al enviar)";
+    $("d-lines").replaceChildren(...doc.lines.map(l => { const tr = document.createElement("tr"); [l.description, l.quantity, money(l.tax_amount), money(l.total)].forEach((v, i) => { const td = tr.insertCell(); td.textContent = v; if (i) td.className = "text-end"; }); return tr; }));
+    $("d-hist").replaceChildren(...hist.map(h => { const li = document.createElement("li"); li.textContent = `${new Date(h.created_at).toLocaleString("es-CR")} · ${h.from_status || "—"} → ${h.to_status}`; return li; }));
+    if (full.ai_analysis) { $("ai").hidden = false; $("ai-text").textContent = full.ai_analysis; }
+  }
 
   async function analyze(id) {
+    if ($("detail-body").hidden || selected !== id) await show({ id });
     $("ai").hidden = false; $("ai-text").textContent = "Analizando con IA local…";
     const d = await api(`/api/v1/invoices/${id}/ai-analysis/`, { method: "POST" });
     $("ai-text").textContent = (d.ai_used ? "" : "(IA no disponible; análisis básico)\n") + d.analysis;
@@ -52,7 +86,7 @@
   const post = (inv, to) => api(`/api/v1/invoices/${inv.id}/transition/`, { method: "POST", body: JSON.stringify({ to, version: inv.version }) });
 
   function row(inv) {
-    const tr = document.createElement("tr");
+    const tr = document.createElement("tr"); tr.style.cursor = "pointer"; tr.onclick = (e) => { if (!e.target.closest("button")) show(inv).catch(err => note(err.message)); };
     cell(tr, inv.issue_date.split("-").reverse().join("/"));
     cell(tr, inv.receiver_name);
     cell(tr, Number(inv.total).toLocaleString("es-CR", { minimumFractionDigits: 2 }), "text-end");

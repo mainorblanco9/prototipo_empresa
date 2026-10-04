@@ -193,3 +193,38 @@ def theme_api(request):
             item["colors"] = THEMES[item["theme"]]["colors"]
         return JsonResponse({"suggestions": suggestions, "ai_used": ai_used})
     return JsonResponse({"detail": "Acción no válida."}, status=400)
+
+
+HACIENDA_STAGES = [
+    ("1", "Borrador", "El proveedor captura la factura (asistente, Excel o API REST).", "draft", "ok"),
+    ("2", "Validación local", "Identificaciones, totales, fecha y periodo abierto antes de enviar.", "ready", "ok"),
+    ("3", "Clave y consecutivo", "Clave numérica de 50 dígitos y consecutivo de 20 (sucursal, terminal, tipo, secuencia).", "queued", "ok"),
+    ("4", "XML v4.4", "Se genera FacturaElectronica con emisor, receptor, líneas e impuestos.", "queued", "ok"),
+    ("5", "Firma XAdES-EPES", "Pendiente: requiere el certificado .p12 del contribuyente (solo producción).", "", "pending"),
+    ("6", "Recepción (POST)", "El gateway obtiene el token OAuth2 y envía a /recepcion/v1/recepcion (202).", "processing", "ok"),
+    ("7", "Consulta de estado", "GET por clave hasta recibir ind-estado: aceptado o rechazado.", "processing", "ok"),
+    ("8", "MensajeHacienda", "Se guarda la respuesta, el análisis con IA y el registro en bitácora.", "accepted", "ok"),
+]
+
+
+@login_required
+def hacienda_flow(request):
+    counts = {
+        row["status"]: row["n"]
+        for row in IssuedInvoice.objects.filter(owner=request.user).values("status").annotate(n=Count("id"))
+    }
+    stages = [
+        {"n": n, "title": title, "text": text, "count": counts.get(status, 0) if status else None, "state": state}
+        for n, title, text, status, state in HACIENDA_STAGES
+    ]
+    from django.conf import settings
+
+    mode = getattr(settings, "HACIENDA_MODE", "local")
+    endpoints = [
+        ("Modo", "Simulador local (sandbox)" if mode == "local" else mode),
+        ("Gateway Node.js", settings.GATEWAY_URL),
+        ("Token (IDP)", "/mock/auth/realms/rut-stag/protocol/openid-connect/token"),
+        ("Recepción", "POST /mock/recepcion/v1/recepcion"),
+        ("Estado", "GET /mock/recepcion/v1/recepcion/{clave}"),
+    ]
+    return render(request, "validador/hacienda_flow.html", {"stages": stages, "endpoints": endpoints, "counts": counts})

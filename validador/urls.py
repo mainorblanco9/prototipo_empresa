@@ -65,6 +65,7 @@ urlpatterns = [
     path("integraciones/", views.integrations, name="integrations"),
     path("api/v1/invoices/import/", invoice_import.InvoiceImportView.as_view(), name="api_invoice_import"),
     path("api/v1/design/theme/", app_views.theme_api, name="api_design_theme"),
+    path("flujo-hacienda/", app_views.hacienda_flow, name="hacienda_flow"),
     path("panel/", app_views.dashboard, name="dashboard"),
     path("cierres/", app_views.closures, name="closures"),
     path("bitacora/", app_views.activity_log, name="activity_log"),

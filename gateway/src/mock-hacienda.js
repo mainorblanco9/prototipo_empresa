@@ -36,7 +36,11 @@ export function createMockHacienda() {
 
   return {
     receipts,
-    handle({ method, path, headers = {}, body = "" }) {
+    handle({ method, path: rawPath, headers = {}, body = "" }) {
+      // Mismas rutas que ATV: IDP de Keycloak y /recepcion/v1/recepcion.
+      const path = rawPath
+        .replace(/^\/auth\/realms\/[^/]+\/protocol\/openid-connect\/token$/, "/token")
+        .replace(/^\/recepcion\/v1\/recepcion/, "/recepcion");
       if (method === "POST" && path === "/token") {
         const form = new URLSearchParams(body);
         if (form.get("grant_type") !== "password" || !form.get("username") || !form.get("password")) {

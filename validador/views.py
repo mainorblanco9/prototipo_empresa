@@ -592,7 +592,7 @@ def _invoice_month_dashboard(batch):
 
 @login_required
 def download_sample_invoices(request):
-    sample_path = settings.BASE_DIR / "ejemplo_facturas_octubre.csv"
+    sample_path = settings.BASE_DIR / "samples" / "ejemplo_facturas_octubre.csv"
     try:
         content = sample_path.read_bytes()
     except OSError as exc:

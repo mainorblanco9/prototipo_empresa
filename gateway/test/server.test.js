@@ -118,3 +118,18 @@ test("el simulador valida clave y evita duplicados", async () => {
 test("modo real no disponible", () => {
   assert.throws(() => createHaciendaClient({ mode: "production" }), /XAdES/);
 });
+
+test("el simulador expone las rutas oficiales de ATV (IDP y /recepcion/v1/recepcion)", () => {
+  const mock = createMockHacienda();
+  const token = mock.handle({
+    method: "POST",
+    path: "/auth/realms/rut-stag/protocol/openid-connect/token",
+    body: "grant_type=password&username=u&password=p",
+  });
+  assert.equal(token.status, 200);
+  const headers = { authorization: `Bearer ${token.body.access_token}` };
+  const sent = mock.handle({ method: "POST", path: "/recepcion/v1/recepcion", headers, body: JSON.stringify(payload()) });
+  assert.equal(sent.status, 202);
+  const state = mock.handle({ method: "GET", path: `/recepcion/v1/recepcion/${CLAVE}`, headers });
+  assert.equal(state.status, 200);
+});

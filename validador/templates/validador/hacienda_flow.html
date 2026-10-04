@@ -1,0 +1,31 @@
+{% extends 'validador/_shell.html' %}
+{% block title %}Flujo Hacienda{% endblock %}
+{% block heading %}Flujo de comprobantes electrónicos{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-xl-8">
+    <div class="gb-card">
+      <p class="text-secondary small mb-3">Así recorre cada factura el proceso de recepción de Hacienda (ATV). El conteo muestra cuántas de tus facturas están en cada etapa.</p>
+      <div class="gb-grid-2">
+        {% for s in stages %}
+        <div class="gb-check border rounded-4 p-3">
+          <span class="gb-dot {% if s.state == 'ok' %}ok{% else %}warn{% endif %}">{{ s.n }}</span>
+          <div class="flex-fill"><div class="fw-semibold">{{ s.title }}{% if s.count is not None %} <span class="gb-badge ms-1">{{ s.count }}</span>{% endif %}</div><div class="small text-secondary">{{ s.text }}</div></div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="gb-card mb-3">
+      <h2 class="h6 fw-bold">Ambiente y rutas</h2>
+      <dl class="gb-dl">{% for k, v in endpoints %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}</dl>
+    </div>
+    <div class="gb-card">
+      <h2 class="h6 fw-bold">Resultados</h2>
+      <div class="d-flex gap-2 flex-wrap"><span class="gb-badge accepted">Aceptadas {{ counts.accepted|default:0 }}</span><span class="gb-badge rejected">Rechazadas {{ counts.rejected|default:0 }}</span><span class="gb-badge draft">Anuladas {{ counts.cancelled|default:0 }}</span></div>
+      <p class="small text-secondary mt-3 mb-0">El modo real (sandbox/producción de Hacienda) se habilitará cuando exista la firma XAdES y el certificado del contribuyente.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -190,8 +190,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const self = `http://127.0.0.1:${port}/mock`;
   const hacienda = createHaciendaClient({
     mode: process.env.HACIENDA_MODE ?? "local",
-    baseUrl: process.env.HACIENDA_BASE_URL ?? self,
-    tokenUrl: process.env.HACIENDA_TOKEN_URL ?? `${self}/token`,
+    baseUrl: process.env.HACIENDA_BASE_URL ?? `${self}/recepcion/v1`,
+    tokenUrl: process.env.HACIENDA_TOKEN_URL ?? `${self}/auth/realms/rut-stag/protocol/openid-connect/token`,
     username: process.env.HACIENDA_USER,
     password: process.env.HACIENDA_PASSWORD,
   });

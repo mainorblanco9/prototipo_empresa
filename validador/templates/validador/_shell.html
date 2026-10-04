@@ -10,7 +10,7 @@
         integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
   {% include 'validador/_theme.html' %}
   <style>
-    .gb-shell { display:grid; grid-template-columns: 250px 1fr; min-height:100vh; }
+    .gb-shell { display:grid; grid-template-columns: 220px 1fr; min-height:100vh; }
     .gb-side { background:var(--surface); border-right:1px solid var(--line); padding:1.25rem 1rem; position:sticky; top:0; height:100vh; display:flex; flex-direction:column; gap:.25rem; }
     .gb-logo { display:flex; align-items:center; gap:.5rem; font-weight:800; font-size:1.25rem; color:var(--brand-dark); text-decoration:none; margin-bottom:1.25rem; }
     .gb-logo .brand-mark { width:2.2rem; height:2.2rem; display:inline-grid; place-items:center; }
@@ -44,6 +44,18 @@
     .gb-dialog .acts { display:flex; gap:.5rem; justify-content:flex-end; }
     .gb-dialog.danger .btn-primary { background:#d92d20 !important; border-color:#d92d20 !important; }
     @keyframes gbpop { from { transform:scale(.94); opacity:0 } to { transform:none; opacity:1 } }
+    .gb-main .container, .gb-main .page-shell, .gb-main .app-main, .gb-main .wizard { max-width:none !important; width:100% !important; }
+    .gb-main { padding:1rem clamp(.75rem,1.6vw,1.75rem) 1.5rem; }
+    .gb-top { margin-bottom:.9rem; } .gb-top h1 { font-size:1.4rem; }
+    .gb-fill { height:calc(100vh - 8.5rem); display:flex; flex-direction:column; min-height:22rem; }
+    .gb-scroll { overflow:auto; flex:1 1 auto; min-height:0; }
+    .gb-scroll thead th { position:sticky; top:0; background:var(--surface); z-index:1; }
+    #detail { overflow:auto; }
+    .gb-dl { display:grid; grid-template-columns:5.5rem 1fr; gap:.25rem .75rem; font-size:.88rem; margin:0; } .gb-dl dt { color:var(--muted); font-weight:700; } .gb-dl dd { margin:0; word-break:break-all; }
+    .gb-hist { font-size:.8rem; color:var(--muted); padding-left:1.1rem; margin:.25rem 0 .75rem; }
+    .gb-aibox { background:var(--soft); border-radius:1rem; padding:.75rem 1rem; } .gb-aibox pre { white-space:pre-wrap; font:inherit; margin:.4rem 0 0; }
+    .gb-grid-2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,26rem),1fr)); gap:1rem; align-items:start; }
+    @media (max-width:1199px) { .gb-fill { height:auto; } .gb-scroll { max-height:60vh; } }
     .gb-top h1:empty { display:none; }
     .gb-tools { position:relative; }
     .gb-themebtn { border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:999px; padding:.3rem .8rem; font-weight:700; font-size:.85rem; }
@@ -76,6 +88,7 @@
       <div class="grp">Control</div>
       <a href="{% url 'closures' %}" class="{% if name == 'closures' %}on{% endif %}">✅ Cierre de periodo</a>
       <a href="{% url 'activity_log' %}" class="{% if name == 'activity_log' %}on{% endif %}">📜 Bitácora</a>
+      <a href="{% url 'hacienda_flow' %}" class="{% if name == 'hacienda_flow' %}on{% endif %}">🛰️ Flujo Hacienda</a>
       <div class="grp">Conectar</div>
       <a href="{% url 'integrations' %}" class="{% if name == 'integrations' %}on{% endif %}">🔌 Integraciones API</a>
       <a href="{% url 'mobile_capture' %}">📱 Captura móvil</a>

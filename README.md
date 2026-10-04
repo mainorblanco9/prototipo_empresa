@@ -57,7 +57,7 @@ source .venv/Scripts/activate
 - Ollama recomienda qué columnas comparar. La aplicación calcula los agregados y dibuja un gráfico de barras de forma local; si Ollama no responde, usa una selección de respaldo basada en los tipos detectados y muestra un aviso.
 - Reconoce flujos financieros con meses tanto en columnas como en filas. En archivos XLSX calcula localmente fórmulas aritméticas y sumas simples que no tengan resultados guardados por Excel. Si hay varias hojas anuales, puedes cambiar la hoja y el indicador del gráfico. La vista previa y la descarga corresponden a la hoja seleccionada automáticamente; los controles del gráfico responden al instante en el navegador, sin otra consulta a Ollama. Los meses mantienen su orden y los valores negativos se representan desde la línea de cero.
 - Muestra una vista previa de hasta 200 filas; el análisis permite hasta 20.000 filas y 100 columnas. El reporte CSV conserva todas las filas y el enlace vence en 10 minutos.
-- Prueba el flujo con [ejemplo_ventas.csv](./ejemplo_ventas.csv), que usa punto y coma como separador.
+- Prueba el flujo con [ejemplo_ventas.csv](./samples/ejemplo_ventas.csv), que usa punto y coma como separador.
 - En el análisis general y la validación de gastos, los valores de celdas se procesan localmente. Para las facturas con encabezados desconocidos, consulta la nota de privacidad del flujo de autodetección más abajo. El flujo costarricense verifica fecha, proveedor, factura duplicada, moneda CRC, importes no negativos y suma subtotal + impuesto.
 - La pantalla autenticada `/facturas/` y el endpoint `POST /api/invoices/parse/` detectan tablas de facturas en hojas y filas distintas de archivos XLSX/CSV/TSV, sin un tope fijo de columnas o filas en este flujo (el archivo está limitado a 10 MB), y convierten cada fila en un objeto JSON versionado. Si los encabezados no se reconocen, Ollama en `localhost` recibe todos los encabezados y una muestra de hasta 10 filas; la cantidad de filas de muestra se adapta al ancho de la tabla para mantener acotado el prompt, y cada valor se trunca a 100 caracteres. El resto del archivo se procesa en Django local. Este flujo no usa OpenAI ni envía datos fuera del computador; las tablas con encabezados reconocidos no requieren IA. Devuelve HTTP 200 cuando las facturas son válidas, HTTP 422 cuando requieren revisión y HTTP 503 si hace falta mapear encabezados pero Ollama no está disponible. Esta etapa solo prepara y valida datos; no transmite facturas a TribuCR.
 - En desarrollo local puedes ejecutar una simulación técnica local desde `/facturas/modelo/` o `POST /api/invoices/local-simulation/`. Solo se habilita con `DEBUG=true`, requiere sesión autenticada y no llama a Hacienda ni genera acuses o recibos fiscales. `/api/invoices/mock-submit/` se conserva como alias legado.
@@ -103,7 +103,7 @@ MXN, queda en revisión y no se incluye en el modelo listo ni en la simulación.
 El soporte para dólares queda para una etapa posterior. Incluye análisis
 mensual por factura en colones; el gráfico local solo incluye filas validadas.
 La segunda etapa se habilita únicamente para lotes válidos. Descarga
-[ejemplo_facturas_octubre.csv](./ejemplo_facturas_octubre.csv) para probar tres
+[ejemplo_facturas_octubre.csv](./samples/ejemplo_facturas_octubre.csv) para probar tres
 facturas ficticias en CRC. Sus datos y la validación son exclusivamente de
 demostración y no constituyen documentos ni certificación fiscal.
 
@@ -191,7 +191,7 @@ Ejemplo para una sesión ya iniciada con su token CSRF:
 
 ```bash
 curl -b cookies.txt -H "X-CSRFToken: $CSRF_TOKEN" \
-  -F "archivo=@ejemplo_gastos_validos.xlsx" \
+  -F "archivo=@samples/ejemplo_gastos_validos.xlsx" \
   http://127.0.0.1:8000/api/invoices/parse/
 ```
 
@@ -378,3 +378,22 @@ Las API keys se guardan hasheadas (SHA-256) y se muestran una sola vez.
 - **Cierres** (/cierres/): validador por periodo (AAAA-MM); bloquea si hay borradores, rechazadas, en cola o totales inconsistentes.
 - **Bitácora** (/bitacora/): facturas y cierres aceptados o rechazados, con exportación CSV.
 
+
+## Estructura del repositorio
+
+```
+config/      Proyecto Django (settings, urls)
+validador/   App principal: modelos, API REST (api.py), periodos (periods.py), importación, plantillas
+gateway/     Gateway Node.js + simulador de Hacienda (rutas ATV: /recepcion/v1/recepcion)
+mobile/      Envoltorio Capacitor (Android/iOS)
+samples/     Archivos de ejemplo (CSV/XLSX)
+scripts/     Utilidades (generar Excel de ejemplo)
+```
+
+Datos de prueba: `python manage.py seed_guanabill --user demo` y `python manage.py seed_bancos --user demo --send`.
+Pruebas: `python manage.py test` y `cd gateway; npm test`.
+
+## Contribuir
+
+Ramas de trabajo parten de `dev`; los PR se abren hacia `dev` y `main` se actualiza solo desde `dev`.
+Antes de abrir un PR ejecuta las dos suites de pruebas. Nunca subas `.env`, `db.sqlite3` ni certificados.
