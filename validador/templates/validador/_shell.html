@@ -34,6 +34,16 @@
     .gb-check:last-child { border:0; }
     .gb-dot { flex:0 0 1.5rem; height:1.5rem; border-radius:50%; display:grid; place-items:center; font-size:.8rem; font-weight:800; color:#fff; }
     .gb-dot.ok { background:#12a150; } .gb-dot.bad { background:#d92d20; } .gb-dot.warn { background:#f79009; }
+    .gb-modal { position:fixed; inset:0; z-index:100; display:none; align-items:center; justify-content:center; background:rgba(2,11,36,.55); backdrop-filter:blur(3px); padding:1rem; }
+    .gb-modal.open { display:flex; }
+    .gb-dialog { background:var(--surface); color:var(--ink); border:1px solid var(--line); border-radius:1.5rem; padding:1.5rem; width:min(26rem,100%); box-shadow:0 30px 60px rgba(0,0,0,.35); animation:gbpop .15s ease-out; }
+    .gb-dialog .ic { width:3rem; height:3rem; border-radius:50%; display:grid; place-items:center; font-size:1.4rem; background:var(--soft2); margin-bottom:.75rem; }
+    .gb-dialog.danger .ic { background:#fdecec; }
+    .gb-dialog h2 { font-size:1.15rem; font-weight:800; margin:0 0 .35rem; }
+    .gb-dialog p { color:var(--muted); margin:0 0 1.25rem; font-size:.92rem; }
+    .gb-dialog .acts { display:flex; gap:.5rem; justify-content:flex-end; }
+    .gb-dialog.danger .btn-primary { background:#d92d20 !important; border-color:#d92d20 !important; }
+    @keyframes gbpop { from { transform:scale(.94); opacity:0 } to { transform:none; opacity:1 } }
     .gb-top h1:empty { display:none; }
     .gb-tools { position:relative; }
     .gb-themebtn { border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:999px; padding:.3rem .8rem; font-weight:700; font-size:.85rem; }
@@ -101,6 +111,37 @@
   </main>
 </div>
 {% endwith %}
+<div class="gb-modal" id="gb-modal" role="dialog" aria-modal="true" aria-labelledby="gb-m-title">
+  <div class="gb-dialog" id="gb-dialog">
+    <div class="ic" id="gb-m-ic">❓</div>
+    <h2 id="gb-m-title"></h2>
+    <p id="gb-m-text"></p>
+    <div class="acts"><button type="button" class="btn btn-outline-secondary" id="gb-m-no">Cancelar</button><button type="button" class="btn btn-primary" id="gb-m-yes">Confirmar</button></div>
+  </div>
+</div>
+<script>
+window.gbConfirm = (opts) => new Promise((resolve) => {
+  const m = document.getElementById("gb-modal"), dlg = document.getElementById("gb-dialog");
+  const yes = document.getElementById("gb-m-yes"), no = document.getElementById("gb-m-no");
+  document.getElementById("gb-m-title").textContent = opts.title || "¿Confirmas esta acción?";
+  document.getElementById("gb-m-text").textContent = opts.text || "";
+  document.getElementById("gb-m-ic").textContent = opts.icon || (opts.danger ? "⚠️" : "❓");
+  yes.textContent = opts.ok || "Confirmar"; dlg.classList.toggle("danger", !!opts.danger);
+  const done = (v) => { m.classList.remove("open"); document.removeEventListener("keydown", key); yes.onclick = no.onclick = m.onclick = null; resolve(v); };
+  const key = (e) => { if (e.key === "Escape") done(false); };
+  document.addEventListener("keydown", key);
+  yes.onclick = () => done(true); no.onclick = () => done(false); m.onclick = (e) => { if (e.target === m) done(false); };
+  m.classList.add("open"); no.focus();
+});
+document.addEventListener("click", async (e) => {
+  const el = e.target.closest("[data-confirm]");
+  if (!el) return;
+  if (el.dataset.confirmed) { delete el.dataset.confirmed; return; }
+  e.preventDefault(); e.stopImmediatePropagation();
+  const ok = await gbConfirm({ title: el.dataset.confirmTitle, text: el.dataset.confirm, ok: el.dataset.confirmOk, danger: el.dataset.confirmDanger === "1", icon: el.dataset.confirmIcon });
+  if (ok) { el.dataset.confirmed = "1"; el.click(); }
+}, true);
+</script>
 <script>
 (() => {
   const root = document.documentElement, pop = document.getElementById("gb-pop"), btn = document.getElementById("gb-themebtn");

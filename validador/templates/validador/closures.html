@@ -21,9 +21,9 @@
         {% csrf_token %}<input type="hidden" name="period" value="{{ period }}">
         {% if report.already_closed %}
           <input class="form-control" name="note" placeholder="Motivo de la reapertura" maxlength="250" style="max-width:320px">
-          <button class="btn btn-outline-primary" name="action" value="reopen" type="submit">Reabrir periodo</button>
+          <button class="btn btn-outline-primary" name="action" value="reopen" type="submit" data-confirm-title="¿Reabrir el periodo?" data-confirm="Se permitirá modificar facturas de este mes y quedará registrado en la bitácora." data-confirm-ok="Reabrir" data-confirm-icon="🔓">Reabrir periodo</button>
         {% else %}
-          <button class="btn btn-primary" name="action" value="close" type="submit">{% if report.can_close %}Cerrar periodo{% else %}Intentar cierre (quedará en la bitácora){% endif %}</button>
+          <button class="btn btn-primary" name="action" value="close" type="submit" data-confirm-title="¿Cerrar el periodo?" data-confirm="Se validará el mes y, si pasa, no se podrán crear ni editar facturas en él. El intento queda en la bitácora." data-confirm-ok="Cerrar periodo" data-confirm-icon="🔒">{% if report.can_close %}Cerrar periodo{% else %}Intentar cierre (quedará en la bitácora){% endif %}</button>
           <a class="btn btn-outline-primary" href="{% url 'issued_invoice_list' %}?period={{ period }}">Ver facturas del mes</a>
         {% endif %}
       </form>

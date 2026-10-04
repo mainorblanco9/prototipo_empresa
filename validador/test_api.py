@@ -587,3 +587,12 @@ class LocalValidationAndThemeTests(HaciendaFlowTests):
         self.assertFalse(rec["ai_used"])
         self.assertEqual(rec["suggestions"][0]["theme"], "midnight")
         self.assertContains(web.get(reverse("dashboard")), 'data-theme="ocean"')
+
+class SeedBancosTests(TestCase):
+    def test_seed_bancos_creates_varied_invoices(self):
+        from django.core.management import call_command
+        call_command("seed_bancos", "--user", "tester", "--count", "14", stdout=__import__("io").StringIO())
+        invoices = IssuedInvoice.objects.filter(owner__username="tester")
+        self.assertEqual(invoices.count(), 14)
+        self.assertTrue(invoices.filter(status="ready").exists())
+        self.assertGreater(len({i.issue_date.strftime("%Y-%m") for i in invoices}), 1)

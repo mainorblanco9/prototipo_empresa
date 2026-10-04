@@ -10,7 +10,7 @@
         <option value="accepted">Aceptado</option><option value="rejected">Rechazado</option><option value="cancelled">Anulado</option></select></div>
     <div class="col-6 col-md-3"><label class="form-label small fw-bold">Periodo</label><input class="form-control" type="month" id="f-month"></div>
     <div class="col-12 col-md-3"><label class="form-label small fw-bold">Buscar receptor</label><input class="form-control" id="f-q" placeholder="Nombre"></div>
-    <div class="col-12 col-md-3 d-flex gap-2"><button class="btn btn-primary flex-fill" id="send-ready" type="button">Enviar todas las listas</button>
+    <div class="col-12 col-md-3 d-flex gap-2"><button class="btn btn-primary flex-fill" id="send-ready" data-confirm-title="¿Enviar todas las listas?" data-confirm="Se enviarán a Hacienda todas las facturas listas de esta vista." data-confirm-ok="Enviar todas" data-confirm-icon="📤" type="button">Enviar todas las listas</button>
       <a class="btn btn-outline-primary" href="{% url 'invoice_wizard' %}">＋</a></div>
   </div>
 </div>
@@ -59,8 +59,8 @@
     const b = document.createElement("span"); b.className = "gb-badge " + inv.status; b.textContent = inv.status_label; cell(tr, "").appendChild(b);
     const info = cell(tr, inv.hacienda_message || inv.clave || "—"); info.style.cssText = "word-break:break-all;font-size:.78rem;max-width:260px";
     const actions = tr.insertCell(); actions.className = "text-nowrap";
-    const add = (label, fn, outline) => {
-      const btn = document.createElement("button"); btn.className = "btn btn-sm me-1 " + (outline ? "btn-outline-primary" : "btn-primary"); btn.textContent = label;
+    const add = (label, fn, outline, ask) => {
+      const btn = document.createElement("button"); if (ask) Object.assign(btn.dataset, ask); btn.className = "btn btn-sm me-1 " + (outline ? "btn-outline-primary" : "btn-primary"); btn.textContent = label;
       btn.onclick = async () => { btn.disabled = true; note(""); try { await fn(); } catch (e) { note(e.message); } load(); };
       actions.appendChild(btn);
     };
@@ -68,10 +68,10 @@
       const d = await api(`/api/v1/invoices/${inv.id}/validate/`, { method: "POST" });
       note(d.valid ? "✔ Validación local superada: lista para enviar (no se envió nada a Hacienda)." : "✖ Corrige antes de enviar: " + d.issues.map(i => i.message).join(" "));
     }, true);
-    if (inv.status === "draft") { add("Marcar lista", () => post(inv, "ready")); add("Anular", () => post(inv, "cancelled"), true); }
-    if (["ready", "queued", "processing"].includes(inv.status)) add("Enviar", async () => { await api(`/api/v1/invoices/${inv.id}/submit/`, { method: "POST" }); await analyze(inv.id); });
-    if (["accepted", "rejected"].includes(inv.status)) add("✨ Analizar", () => analyze(inv.id), true);
-    if (inv.status === "rejected") add("Corregir", () => post(inv, "draft"), true);
+    if (inv.status === "draft") { add("Marcar lista", () => post(inv, "ready")); add("Anular", () => post(inv, "cancelled"), true, { confirmTitle: "¿Anular la factura?", confirm: "La factura de " + inv.receiver_name + " quedará anulada y no se enviará a Hacienda.", confirmOk: "Anular", confirmDanger: "1" }); }
+    if (["ready", "queued", "processing"].includes(inv.status)) add("Enviar", async () => { await api(`/api/v1/invoices/${inv.id}/submit/`, { method: "POST" }); await analyze(inv.id); }, false, { confirmTitle: "¿Enviar a Hacienda?", confirm: "Se enviará la factura de " + inv.receiver_name + " por " + Number(inv.total).toLocaleString("es-CR") + " al simulador de Hacienda.", confirmOk: "Enviar", confirmIcon: "📤" });
+    if (["accepted", "rejected"].includes(inv.status)) add("✨ Analizar", () => analyze(inv.id), true, { confirmTitle: "¿Analizar con IA?", confirm: "La IA local revisará la respuesta de Hacienda. Puede tardar unos segundos.", confirmOk: "Analizar", confirmIcon: "✨" });
+    if (inv.status === "rejected") add("Corregir", () => post(inv, "draft"), true, { confirmTitle: "¿Volver a borrador?", confirm: "La factura rechazada volverá a borrador para corregirla.", confirmOk: "Corregir", confirmIcon: "✏️" });
     return tr;
   }
 
