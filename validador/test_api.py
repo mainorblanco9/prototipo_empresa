@@ -402,6 +402,16 @@ class RejectedFlowTests(HaciendaFlowTests):
         self.assertEqual(out["changed"], 1)
         self.assertEqual(IssuedInvoice.objects.get().status, "cancelled")
 
+    def test_cancel_pending_unblocks_close(self):
+        from . import periods
+        from .models import IssuedInvoice
+
+        owner = IssuedInvoice.objects.get().owner
+        period = IssuedInvoice.objects.get().issue_date.strftime("%Y-%m")
+        self.assertFalse(periods.validate_period(owner, period)["can_close"])
+        periods.fix_period(owner, period, "cancel_pending", owner)
+        self.assertEqual(IssuedInvoice.objects.get().status, "cancelled")
+
 
 class AiAssistTests(HaciendaFlowTests):
     def test_review_draft_returns_exact_cost_and_ai_advice(self):

@@ -125,6 +125,9 @@ FIX_ACTIONS = {
     "cancel_rejected": "Anular las facturas rechazadas",
     "reopen_rejected": "Devolver las rechazadas a borrador para editarlas",
     "ready_drafts": "Marcar como listas los borradores válidos",
+    "cancel_pending": "Anular las facturas sin resolver (borrador, listas o en cola)",
+    "send_all": "Preparar y enviar a Hacienda todo el periodo",
+    "send_pending": "Enviar a Hacienda las facturas listas o en cola",
 }
 
 
@@ -145,6 +148,45 @@ def fix_period(owner, period, action, actor=None):
         IssuedInvoiceStatusEvent.objects.create(
             invoice=invoice, from_status=invoice.status, to_status=to, actor=actor
         )
+
+    if action == "cancel_pending":
+        for invoice in queryset.filter(status__in=[S.DRAFT, S.READY, S.QUEUED, S.PROCESSING]):
+            move(invoice, S.CANCELLED)
+            changed += 1
+        return {"changed": changed, "skipped": skipped}
+
+    if action == "send_all":
+        first = fix_period(owner, period, "ready_drafts", actor)
+        second = fix_period(owner, period, "send_pending", actor)
+        return {"changed": second["changed"], "skipped": first["skipped"] + second["skipped"]}
+
+    if action == "send_pending":
+        import json
+        import urllib.error
+        import urllib.request
+
+        from django.conf import settings
+        from rest_framework.authtoken.models import Token
+
+        token, _ = Token.objects.get_or_create(user=owner)
+        for invoice in queryset.filter(status__in=[S.READY, S.QUEUED, S.PROCESSING]):
+            issues = hacienda.validate_invoice(invoice)
+            if issues:
+                skipped.append(f"{invoice.receiver_name}: {issues[0]['message']}")
+                continue
+            req = urllib.request.Request(
+                f"{settings.GATEWAY_URL}/invoices/{invoice.pk}/submit", method="POST",
+                headers={"Authorization": f"Token {token.key}"},
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=30):
+                    changed += 1
+            except urllib.error.HTTPError as exc:
+                skipped.append(f"{invoice.receiver_name}: el gateway respondió {exc.code}")
+            except (urllib.error.URLError, TimeoutError, ValueError):
+                skipped.append("No se pudo contactar al gateway; verifica que esté en ejecución.")
+                break
+        return {"changed": changed, "skipped": skipped}
 
     if action in ("cancel_rejected", "reopen_rejected"):
         for invoice in queryset.filter(status=S.REJECTED):

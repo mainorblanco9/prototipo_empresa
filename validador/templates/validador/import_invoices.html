@@ -4,7 +4,7 @@
 {% block content %}
 <div class="gb-card mb-3">
   <p class="mb-2">Una fila por línea de factura; las filas con el mismo número de <code>factura</code> forman un comprobante. Acepta <strong>.xlsx</strong> y <strong>.csv</strong>.</p>
-  <a class="btn btn-outline-primary btn-sm mb-3" href="{% url 'import_template' %}">Descargar plantilla</a>
+  <a class="btn btn-outline-primary btn-sm mb-3" id="tpl" href="{% url 'import_template' %}" download="plantilla-guanabill.csv">Descargar plantilla</a>
   <form id="f" class="d-flex gap-2 flex-wrap">
     <input class="form-control" style="max-width:380px" type="file" id="file" accept=".csv,.xlsx" required>
     <button class="btn btn-outline-primary" type="submit">Validar archivo</button>
@@ -23,6 +23,16 @@
 <script>
 const $ = (id) => document.getElementById(id);
 let last = null;
+$("tpl").onclick = async (e) => {
+  e.preventDefault();
+  try {
+    const res = await fetch(e.currentTarget.href, { credentials: "same-origin" });
+    if (!res.ok) throw new Error();
+    const url = URL.createObjectURL(await res.blob()), a = document.createElement("a");
+    a.href = url; a.download = "plantilla-guanabill.csv"; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } catch { $("msg").textContent = "No se pudo descargar la plantilla. Intenta de nuevo."; }
+};
 window.gbAiExtra = () => last ? `Archivo con ${last.total} facturas, ${last.valid} válidas. Errores: ` + last.results.filter(r => r.status === "error").slice(0, 12).map(r => `${r.factura || "?"}: ${r.errors.join(" ")}`).join(" | ") : "";
 const csrf = () => document.querySelector("[name=csrfmiddlewaretoken]").value;
 async function send(confirm) {

@@ -410,3 +410,9 @@ Antes de abrir un PR ejecuta las dos suites de pruebas. Nunca subas `.env`, `db.
 - El cierre de periodo ofrece acciones rápidas por cada punto bloqueante (marcar listas, devolver a borrador, anular rechazadas).
 - El botón **? Asistente** guía cada canal (manual, Excel, API REST, cierre) con la IA local; si Ollama no está activo responde con una guía fija.
 - Endpoints: `POST /api/v1/invoices/<id>/ai-fix/` y `POST /api/v1/ai/assistant/`.
+
+## Preparación para certificación / preproducción
+
+El gateway reproduce el contrato público de ATV: token OAuth2 (Keycloak `/auth/realms/<realm>/protocol/openid-connect/token`), `POST /recepcion/v1/recepcion` (202 + `Location`), `GET /recepcion/v1/recepcion/{clave}` con `ind-estado` (recibido, procesando, aceptado, rechazado) y `respuesta-xml` en base64 (MensajeHacienda 4.4). Para apuntar a preproducción solo se cambian `HACIENDA_BASE_URL` y `HACIENDA_TOKEN_URL`; el envío real sigue bloqueado hasta contar con firma XAdES y CABYS oficial.
+
+En el cierre de periodo: *Preparar y enviar* marca listos los borradores válidos y los envía; *Anular pendientes* descarta las que no se vayan a enviar.
