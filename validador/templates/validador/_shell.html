@@ -10,8 +10,8 @@
         integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
   {% include 'validador/_theme.html' %}
   <style>
-    .gb-shell { display:grid; grid-template-columns: 220px 1fr; min-height:100vh; }
-    .gb-side { background:var(--surface); border-right:1px solid var(--line); padding:1.25rem 1rem; position:sticky; top:0; height:100vh; display:flex; flex-direction:column; gap:.25rem; }
+    .gb-shell { display:grid; grid-template-columns: 220px minmax(0,1fr); min-height:100vh; min-height:100dvh; }
+    .gb-side { background:var(--surface); border-right:1px solid var(--line); padding:1.25rem 1rem; position:sticky; top:0; height:100vh; height:100dvh; overflow-y:auto; overscroll-behavior:contain; z-index:60; display:flex; flex-direction:column; gap:.25rem; }
     .gb-logo { display:flex; align-items:center; gap:.5rem; font-weight:800; font-size:1.25rem; color:var(--brand-dark); text-decoration:none; margin-bottom:1.25rem; }
     .gb-logo .brand-mark { width:2.2rem; height:2.2rem; display:inline-grid; place-items:center; }
     .gb-nav a { display:flex; align-items:center; gap:.7rem; padding:.65rem .9rem; border-radius:999px; text-decoration:none; color:var(--ink); font-weight:600; }
@@ -66,10 +66,50 @@
     .gb-sw button.on { border-color:var(--brand); }
     .gb-sw i { width:1.3rem; height:1.3rem; border-radius:50%; display:inline-block; }
     .gb-sug { border:1px solid var(--line); border-radius:.9rem; padding:.5rem .7rem; margin-top:.5rem; display:flex; justify-content:space-between; gap:.5rem; align-items:center; font-size:.82rem; }
+    html, body { overflow-x:hidden; }
+    .gb-main img, .gb-main canvas, .gb-main video { max-width:100%; height:auto; }
+    .gb-card { overflow-x:auto; }
+    .gb-stat .n { font-size:clamp(1.4rem,2.2vw,2rem); }
+    .gb-menu-btn, .gb-bar, .gb-backdrop { display:none; }
+    .gb-nav a .t { overflow:hidden; text-overflow:ellipsis; }
+    .gb-cr { display:grid; grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr)); gap:.5rem; }
+    .gb-cr .it { background:var(--soft); border-radius:1rem; padding:.55rem .75rem; font-size:.8rem; color:var(--muted); }
+    .gb-cr .it b { display:block; color:var(--ink); font-size:1.05rem; }
+    .gb-flag { display:inline-block; width:1.4rem; height:.9rem; border-radius:2px; vertical-align:-.1rem; background:linear-gradient(#002b7f 0 16%,#fff 16% 32%,#ce1126 32% 68%,#fff 68% 84%,#002b7f 84%); border:1px solid var(--line); }
+    @media (min-width:992px) and (max-width:1199px) {
+      .gb-shell { grid-template-columns:72px minmax(0,1fr); }
+      .gb-side { padding:1rem .5rem; align-items:center; }
+      .gb-logo span:not(.brand-mark), .gb-nav .grp, .gb-side-foot { display:none; }
+      .gb-nav a { justify-content:center; padding:.7rem; font-size:1.2rem; }
+      .gb-nav a .t { display:none; }
+    }
     @media (max-width: 991px) {
       .gb-shell { display:block; }
-      .gb-side { position:static; height:auto; flex-direction:row; align-items:center; overflow-x:auto; padding:.6rem .75rem; gap:.4rem; border-right:0; border-bottom:1px solid var(--line); }
-      .gb-logo { margin:0 .5rem 0 0; font-size:1.05rem; } .gb-nav { display:flex; gap:.25rem; } .gb-nav a { white-space:nowrap; padding:.45rem .8rem; font-size:.9rem; } .gb-nav .grp, .gb-side-foot { display:none; }
+      .gb-side { position:fixed; left:0; top:0; bottom:0; width:min(18rem,84vw); height:auto; transform:translateX(-102%); transition:transform .22s ease; box-shadow:12px 0 40px rgba(0,0,0,.35); border-right:1px solid var(--line); padding:1.1rem 1rem; z-index:90; }
+      body.nav-open .gb-side { transform:none; }
+      .gb-backdrop { position:fixed; inset:0; z-index:80; background:rgba(2,11,36,.5); backdrop-filter:blur(2px); }
+      body.nav-open .gb-backdrop { display:block; }
+      body.nav-open { overflow:hidden; }
+      .gb-menu-btn { display:inline-grid; place-items:center; width:2.5rem; height:2.5rem; border-radius:.9rem; border:1px solid var(--line); background:var(--surface); color:var(--ink); font-size:1.2rem; flex:0 0 auto; }
+      .gb-top { position:sticky; top:0; z-index:40; background:var(--bg,var(--surface)); padding:.5rem 0; margin-bottom:.6rem; flex-wrap:nowrap; }
+      .gb-top h1 { flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .gb-main { padding-bottom:calc(5rem + env(safe-area-inset-bottom)); }
+      .gb-bar { display:grid; grid-template-columns:repeat(5,1fr); position:fixed; left:0; right:0; bottom:0; z-index:70; background:var(--surface); border-top:1px solid var(--line); padding:.3rem .25rem calc(.3rem + env(safe-area-inset-bottom)); }
+      .gb-bar a, .gb-bar button { display:flex; flex-direction:column; align-items:center; gap:.1rem; font-size:.68rem; font-weight:700; color:var(--muted); text-decoration:none; background:none; border:0; padding:.3rem 0; }
+      .gb-bar a.on { color:var(--brand); }
+      .gb-bar .ico { font-size:1.25rem; line-height:1; }
+      .gb-bar .plus .ico { background:var(--brand); color:#fff; width:2.6rem; height:2.6rem; border-radius:50%; display:grid; place-items:center; margin-top:-1.2rem; box-shadow:0 6px 16px var(--shadow); }
+      .gb-user .uname, .gb-user form { display:none; }
+      .gb-fill { height:auto; min-height:0; }
+    }
+    @media (max-width:575px) {
+      .gb-main { padding-left:.65rem; padding-right:.65rem; }
+      .gb-card { padding:.9rem; border-radius:1rem; }
+      .gb-dialog { padding:1.1rem; }
+      .gb-dialog .acts { flex-direction:column-reverse; } .gb-dialog .acts .btn { width:100%; }
+      .btn { min-height:2.5rem; }
+      .gb-pop { position:fixed; left:.5rem; right:.5rem; top:3.8rem; width:auto; max-height:80vh; overflow:auto; }
+      .gb-table { font-size:.82rem; }
     }
   </style>
   {% block head %}{% endblock %}
@@ -80,20 +120,20 @@
   <aside class="gb-side">
     <a class="gb-logo" href="{% url 'dashboard' %}"><span class="brand-mark">G</span><span>Guana<span class="text-primary">Bill</span></span></a>
     <nav class="gb-nav">
-      <a href="{% url 'dashboard' %}" class="{% if name == 'dashboard' %}on{% endif %}">🏠 Panel</a>
+      <a href="{% url 'dashboard' %}" class="{% if name == 'dashboard' %}on{% endif %}"><span>🏠</span><span class="t">Panel</span></a>
       <div class="grp">Facturación</div>
-      <a href="{% url 'issued_invoice_list' %}" class="{% if name == 'issued_invoice_list' %}on{% endif %}">🧾 Facturas</a>
-      <a href="{% url 'invoice_wizard' %}" class="{% if name == 'invoice_wizard' %}on{% endif %}">➕ Nueva factura</a>
-      <a href="{% url 'import_invoices' %}" class="{% if name == 'import_invoices' %}on{% endif %}">📥 Importar Excel</a>
+      <a href="{% url 'issued_invoice_list' %}" class="{% if name == 'issued_invoice_list' %}on{% endif %}"><span>🧾</span><span class="t">Facturas</span></a>
+      <a href="{% url 'invoice_wizard' %}" class="{% if name == 'invoice_wizard' %}on{% endif %}"><span>➕</span><span class="t">Nueva factura</span></a>
+      <a href="{% url 'import_invoices' %}" class="{% if name == 'import_invoices' %}on{% endif %}"><span>📥</span><span class="t">Importar Excel</span></a>
       <div class="grp">Control</div>
-      <a href="{% url 'closures' %}" class="{% if name == 'closures' %}on{% endif %}">✅ Cierre de periodo</a>
-      <a href="{% url 'activity_log' %}" class="{% if name == 'activity_log' %}on{% endif %}">📜 Bitácora</a>
-      <a href="{% url 'hacienda_flow' %}" class="{% if name == 'hacienda_flow' %}on{% endif %}">🛰️ Flujo Hacienda</a>
+      <a href="{% url 'closures' %}" class="{% if name == 'closures' %}on{% endif %}"><span>✅</span><span class="t">Cierre de periodo</span></a>
+      <a href="{% url 'activity_log' %}" class="{% if name == 'activity_log' %}on{% endif %}"><span>📜</span><span class="t">Bitácora</span></a>
+      <a href="{% url 'hacienda_flow' %}" class="{% if name == 'hacienda_flow' %}on{% endif %}"><span>🛰️</span><span class="t">Flujo Hacienda</span></a>
       <div class="grp">Conectar</div>
-      <a href="{% url 'integrations' %}" class="{% if name == 'integrations' %}on{% endif %}">🔌 Integraciones API</a>
-      <a href="{% url 'mobile_capture' %}">📱 Captura móvil</a>
+      <a href="{% url 'integrations' %}" class="{% if name == 'integrations' %}on{% endif %}"><span>🔌</span><span class="t">Integraciones API</span></a>
+      <a href="{% url 'mobile_capture' %}"><span>📱</span><span class="t">Captura móvil</span></a>
       <div class="grp">Herramientas</div>
-      <a href="{% url 'index' %}" class="{% if name == 'index' %}on{% endif %}">📊 Análisis de datos</a>
+      <a href="{% url 'index' %}" class="{% if name == 'index' %}on{% endif %}"><span>📊</span><span class="t">Análisis de datos</span></a>
     </nav>
     <div class="gb-side-foot mt-auto small text-secondary px-2">
       <span class="gb-env">{{ gb_environment_label }}</span>
@@ -103,6 +143,7 @@
   <main class="gb-main">
     {% csrf_token %}
     <div class="gb-top">
+      <button type="button" class="gb-menu-btn" id="gb-menu" aria-label="Abrir menú">☰</button>
       <h1>{% block heading %}{% endblock %}</h1>
       <div class="gb-user">
         <span class="gb-env d-lg-none">{{ gb_environment_label }}</span>
@@ -116,7 +157,7 @@
             <div id="gb-sugs" aria-live="polite"></div>
           </div>
         </div>
-        <span>{{ request.user.username }}</span>
+        <span class="uname">{{ request.user.username }}</span>
         <form method="post" action="{% url 'logout' %}" class="m-0">{% csrf_token %}<button class="btn btn-outline-primary btn-sm" type="submit">Salir</button></form>
       </div>
     </div>
@@ -124,6 +165,22 @@
   </main>
 </div>
 {% endwith %}
+<div class="gb-backdrop" id="gb-backdrop"></div>
+<nav class="gb-bar" aria-label="Navegación rápida">
+  <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}on{% endif %}"><span class="ico">🏠</span>Panel</a>
+  <a href="{% url 'issued_invoice_list' %}" class="{% if request.resolver_match.url_name == 'issued_invoice_list' %}on{% endif %}"><span class="ico">🧾</span>Facturas</a>
+  <a href="{% url 'invoice_wizard' %}" class="plus"><span class="ico">＋</span>Nueva</a>
+  <a href="{% url 'closures' %}" class="{% if request.resolver_match.url_name == 'closures' %}on{% endif %}"><span class="ico">✅</span>Cierre</a>
+  <button type="button" id="gb-menu2"><span class="ico">☰</span>Más</button>
+</nav>
+<script>
+(function(){var b=document.body;function t(o){b.classList.toggle('nav-open',o)}
+['gb-menu','gb-menu2'].forEach(function(i){var e=document.getElementById(i);if(e)e.addEventListener('click',function(){t(!b.classList.contains('nav-open'))})});
+document.getElementById('gb-backdrop').addEventListener('click',function(){t(false)});
+document.querySelectorAll('.gb-side a').forEach(function(a){a.addEventListener('click',function(){t(false)})});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')t(false)});
+window.addEventListener('resize',function(){if(innerWidth>991)t(false)});})();
+</script>
 <div class="gb-modal" id="gb-modal" role="dialog" aria-modal="true" aria-labelledby="gb-m-title">
   <div class="gb-dialog" id="gb-dialog">
     <div class="ic" id="gb-m-ic">❓</div>

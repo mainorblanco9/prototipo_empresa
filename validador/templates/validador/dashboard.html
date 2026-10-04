@@ -2,7 +2,7 @@
 {% block title %}Panel{% endblock %}
 {% block heading %}Panel{% endblock %}
 {% block content %}
-<div class="row g-3"><div class="col-xl-8">
+<div class="row g-3"><div class="col-12 col-xl-8">
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3"><div class="gb-card gb-stat"><div class="n text-success">{{ accepted }}</div><div class="l">Aceptadas por Hacienda</div></div></div>
   <div class="col-6 col-md-3"><div class="gb-card gb-stat"><div class="n text-danger">{{ rejected }}</div><div class="l">Rechazadas</div></div></div>
@@ -11,7 +11,7 @@
 </div>
 
 <div class="row g-3 mb-4">
-  <div class="col-md-7">
+  <div class="col-12 col-lg-7">
     <div class="gb-card h-100">
       <div class="d-flex justify-content-between align-items-start mb-2">
         <div>
@@ -28,7 +28,7 @@
       <a class="btn btn-outline-primary" href="{% url 'invoice_wizard' %}">Nueva factura</a>
     </div>
   </div>
-  <div class="col-md-5">
+  <div class="col-12 col-lg-5">
     <div class="gb-card h-100">
       <h2 class="h6 fw-bold">Requieren atención</h2>
       {% for inv in rejected_invoices %}
@@ -39,7 +39,19 @@
   </div>
 </div>
 
-</div><div class="col-xl-4">
+<div class="gb-card mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2"><h2 class="h6 fw-bold m-0"><span class="gb-flag"></span> Facturación electrónica en Costa Rica</h2><a class="small" href="{% url 'hacienda_flow' %}">Ver flujo con Hacienda →</a></div>
+  <div class="gb-cr">
+    <div class="it"><b>FE · TE</b>Factura y tiquete electrónico</div>
+    <div class="it"><b>NC · ND</b>Notas de crédito y débito</div>
+    <div class="it"><b>FEE · FEC</b>Exportación y compra</div>
+    <div class="it"><b>IVA 13%</b>Tarifas 4%, 2% y 1% reducidas</div>
+    <div class="it"><b>v4.4</b>Esquema XML de comprobantes</div>
+    <div class="it"><b>Clave 50</b>Dígitos por comprobante</div>
+  </div>
+  <div class="small text-secondary mt-2">Cada factura se valida localmente y se envía al simulador de Hacienda (ATV). La firma XAdES y el CABYS real quedan para producción.</div>
+</div>
+</div><div class="col-12 col-xl-4">
 <div class="gb-card gb-fill">
   <div class="d-flex justify-content-between mb-2"><h2 class="h6 fw-bold m-0">Actividad reciente</h2><a class="small" href="{% url 'activity_log' %}">Ver bitácora</a></div>
   <div class="gb-scroll"><table class="table gb-table mb-0">
