@@ -7,6 +7,8 @@
     .dots span { flex:1; height:6px; border-radius:99px; background:#d5dfec; }
     .dots span.on { background: var(--brand-dark); }
     .step { display:none; } .step.on { display:block; }
+    .gb-favs .chip { display:inline-flex; align-items:center; gap:.3rem; margin:0 .4rem .4rem 0; padding:.25rem .3rem .25rem .75rem; border:1px solid var(--line,rgba(128,128,128,.35)); border-radius:999px; font-size:.85rem; cursor:pointer; }
+    .gb-favs .chip button { border:0; background:none; color:inherit; opacity:.6; padding:0 .4rem; }
     .big-q { font-size:1.6rem; font-weight:800; letter-spacing:-.02em; }
     pre.api { background:#001435; color:#cfe6ff; border-radius:1rem; padding:1rem; font-size:.78rem; overflow:auto; }
   </style>{% endblock %}
@@ -17,18 +19,20 @@
     <section class="step on" data-step="0">
       <p class="text-secondary mb-1">Paso 1 de 5</p>
       <h1 class="big-q mb-3">¿Quién emite la factura?</h1>
+      <div class="gb-favs mb-3" data-kind="issuer"></div>
       <label class="form-label fw-semibold">Nombre o razón social del emisor</label>
-      <input class="form-control mb-3" id="issuer_name" value="Comercial Guanacaste S.A.">
+      <input class="form-control mb-3" id="issuer_name"  autocomplete="off">
       <label class="form-label fw-semibold">Cédula jurídica o física</label>
-      <input class="form-control" id="issuer_id" inputmode="numeric" value="3101123456">
+      <input class="form-control" id="issuer_id" inputmode="numeric">
     </section>
     <section class="step" data-step="1">
       <p class="text-secondary mb-1">Paso 2 de 5</p>
       <h1 class="big-q mb-3">¿A quién se la emites?</h1>
+      <div class="gb-favs mb-3" data-kind="receiver"></div>
       <label class="form-label fw-semibold">Nombre del receptor</label>
-      <input class="form-control mb-3" id="receiver_name" value="Cliente de Prueba S.A.">
+      <input class="form-control mb-3" id="receiver_name" autocomplete="off">
       <label class="form-label fw-semibold">Identificación del receptor</label>
-      <input class="form-control mb-3" id="receiver_id" inputmode="numeric" value="3101654321">
+      <input class="form-control mb-3" id="receiver_id" inputmode="numeric">
       <label class="form-label fw-semibold">Fecha de emisión</label>
       <input class="form-control" id="issue_date" type="date">
     </section>
@@ -55,6 +59,7 @@
         <button type="button" class="btn btn-primary" id="send-btn" data-confirm-title="¿Enviar a Hacienda?" data-confirm="Se creará la factura y se enviará al simulador local de Hacienda. Esta acción no se puede deshacer." data-confirm-ok="Crear y enviar" data-confirm-icon="📤">Crear y enviar al sandbox de Hacienda</button>
       </div>
       <div id="result" class="mt-3"></div>
+      <button type="button" class="btn btn-link px-0" id="blank-btn">＋ Nueva factura en blanco</button>
       <pre class="api mt-3" id="payload" hidden></pre>
     </section>
     <div id="err" class="alert alert-danger mt-3" hidden></div>
@@ -98,8 +103,46 @@ function addLine(d = {}) {
     <div class="col"><select class="form-select t">${["13","4","2","1","0","exempt"].map(v => `<option value="${v}" ${v == (d.tax_rate || "13") ? "selected" : ""}>${v === "exempt" ? "Exento" : v + "%"}</option>`).join("")}</select></div></div>`;
   $("lines").appendChild(row);
 }
-addLine({ description: "Servicio de consultoría", unit_price: "113000" });
+addLine();
 $("add-line").onclick = () => addLine();
+
+const favKey = (k) => "gb-favs-" + k;
+const loadFavs = (k) => { try { return JSON.parse(localStorage.getItem(favKey(k)) || "[]"); } catch { return []; } };
+function renderFavs(kind) {
+  const box = document.querySelector(`.gb-favs[data-kind="${kind}"]`);
+  const list = loadFavs(kind);
+  box.innerHTML = "";
+  list.forEach((f, i) => {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.title = f.id;
+    chip.innerHTML = "<span>★ </span><span></span><button type='button' aria-label='Quitar favorito'>✕</button>";
+    chip.children[1].textContent = f.name;
+    chip.onclick = () => { $(kind + "_name").value = f.name; $(kind + "_id").value = f.id; summary(); };
+    chip.querySelector("button").onclick = (e) => {
+      e.stopPropagation();
+      localStorage.setItem(favKey(kind), JSON.stringify(list.filter((_, j) => j !== i)));
+      renderFavs(kind);
+    };
+    box.appendChild(chip);
+  });
+  const add = document.createElement("button");
+  add.type = "button"; add.className = "btn btn-sm btn-outline-primary mb-1"; add.textContent = "★ Guardar como favorito";
+  add.onclick = () => {
+    const name = $(kind + "_name").value.trim(), id = $(kind + "_id").value.trim();
+    if (!name || !id) { $("err").textContent = "Escribe nombre e identificación para guardar el favorito."; $("err").hidden = false; return; }
+    $("err").hidden = true;
+    const rest = loadFavs(kind).filter((f) => f.id !== id);
+    localStorage.setItem(favKey(kind), JSON.stringify([{ name, id }, ...rest].slice(0, 12)));
+    renderFavs(kind);
+  };
+  const clear = document.createElement("button");
+  clear.type = "button"; clear.className = "btn btn-sm btn-link mb-1"; clear.textContent = "Dejar en blanco";
+  clear.onclick = () => { $(kind + "_name").value = ""; $(kind + "_id").value = ""; summary(); };
+  box.append(add, clear);
+}
+renderFavs("issuer"); renderFavs("receiver");
+$("blank-btn").onclick = () => { window.location.href = window.location.pathname; };
 
 const body = () => ({
   client_id: crypto.randomUUID(),
