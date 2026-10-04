@@ -64,6 +64,10 @@
       btn.onclick = async () => { btn.disabled = true; note(""); try { await fn(); } catch (e) { note(e.message); } load(); };
       actions.appendChild(btn);
     };
+    if (["draft", "ready"].includes(inv.status)) add("Validar", async () => {
+      const d = await api(`/api/v1/invoices/${inv.id}/validate/`, { method: "POST" });
+      note(d.valid ? "✔ Validación local superada: lista para enviar (no se envió nada a Hacienda)." : "✖ Corrige antes de enviar: " + d.issues.map(i => i.message).join(" "));
+    }, true);
     if (inv.status === "draft") { add("Marcar lista", () => post(inv, "ready")); add("Anular", () => post(inv, "cancelled"), true); }
     if (["ready", "queued", "processing"].includes(inv.status)) add("Enviar", async () => { await api(`/api/v1/invoices/${inv.id}/submit/`, { method: "POST" }); await analyze(inv.id); });
     if (["accepted", "rejected"].includes(inv.status)) add("✨ Analizar", () => analyze(inv.id), true);

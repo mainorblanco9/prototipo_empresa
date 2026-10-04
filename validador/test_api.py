@@ -549,3 +549,41 @@ class PeriodAndActivityTests(TestCase):
         self.assertEqual(IssuedInvoice.objects.get().total, 213)
         self.assertContains(self.client.get(reverse("import_template")), "factura,emisor")
 
+
+class LocalValidationAndThemeTests(HaciendaFlowTests):
+    def test_validate_reports_bad_issuer_without_sending(self):
+        bad = self.client.post(
+            reverse("api_invoice_list"), payload(issuer_id="1", client_id=str(uuid.uuid4())), format="json"
+        ).json()
+        result = self.client.post(reverse("api_invoice_validate", args=[bad["id"]])).json()
+        self.assertFalse(result["valid"])
+        self.assertIn("emisor", result["issues"][0]["message"])
+        good = self.client.post(reverse("api_invoice_validate", args=[self.invoice["id"]])).json()
+        self.assertTrue(good["valid"])
+
+    def test_queue_blocks_invalid_issuer_with_422(self):
+        bad = self.client.post(
+            reverse("api_invoice_list"), payload(issuer_id="1", client_id=str(uuid.uuid4())), format="json"
+        ).json()
+        self.client.post(
+            reverse("api_invoice_transition", args=[bad["id"]]), {"to": "ready", "version": bad["version"]}, format="json"
+        )
+        current = self.client.get(reverse("api_invoice_detail", args=[bad["id"]])).json()
+        response = self.client.post(
+            reverse("api_invoice_queue", args=[bad["id"]]), {"version": current["version"]}, format="json"
+        )
+        self.assertEqual(response.status_code, 422)
+
+    def test_theme_save_and_recommend(self):
+        user = get_user_model().objects.get(username="hacienda-user")
+        web = self.client_class()
+        web.force_login(user)
+        url = reverse("api_design_theme")
+        ok = web.post(url, {"action": "save", "theme": "ocean"}, content_type="application/json")
+        self.assertEqual(ok.json()["theme"], "ocean")
+        self.assertEqual(web.post(url, {"action": "save", "theme": "x"}, content_type="application/json").status_code, 400)
+        with override_settings(AI_PROVIDER="none"):
+            rec = web.post(url, {"action": "recommend", "description": "algo oscuro de noche"}, content_type="application/json").json()
+        self.assertFalse(rec["ai_used"])
+        self.assertEqual(rec["suggestions"][0]["theme"], "midnight")
+        self.assertContains(web.get(reverse("dashboard")), 'data-theme="ocean"')

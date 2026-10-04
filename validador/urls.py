@@ -1,4 +1,4 @@
-from django.urls import path
+﻿from django.urls import path
 
 from . import api, app_views, invoice_import, pwa, views
 
@@ -31,6 +31,11 @@ urlpatterns = [
         name="api_invoice_history",
     ),
     path(
+        "api/v1/invoices/<uuid:pk>/validate/",
+        api.IssuedInvoiceViewSet.as_view({"post": "validate"}),
+        name="api_invoice_validate",
+    ),
+    path(
         "api/v1/invoices/<uuid:pk>/queue/",
         api.IssuedInvoiceViewSet.as_view({"post": "queue"}),
         name="api_invoice_queue",
@@ -59,6 +64,7 @@ urlpatterns = [
     path("facturas/nueva/", views.invoice_wizard, name="invoice_wizard"),
     path("integraciones/", views.integrations, name="integrations"),
     path("api/v1/invoices/import/", invoice_import.InvoiceImportView.as_view(), name="api_invoice_import"),
+    path("api/v1/design/theme/", app_views.theme_api, name="api_design_theme"),
     path("panel/", app_views.dashboard, name="dashboard"),
     path("cierres/", app_views.closures, name="closures"),
     path("bitacora/", app_views.activity_log, name="activity_log"),

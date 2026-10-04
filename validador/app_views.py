@@ -161,3 +161,35 @@ def import_template(request):
     writer.writerow(TEMPLATE_HEADERS)
     writer.writerows(TEMPLATE_ROWS)
     return response
+import json as _json
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+
+from .design_themes import THEMES, recommend_themes
+from .models import UserDesignPreference
+
+
+@login_required
+@require_POST
+def theme_api(request):
+    try:
+        data = _json.loads(request.body or "{}")
+    except ValueError:
+        return JsonResponse({"detail": "JSON inválido."}, status=400)
+    preference = UserDesignPreference.objects.filter(user=request.user).first()
+    current = preference.theme if preference else "minimal"
+    action = data.get("action")
+    if action == "save":
+        theme = data.get("theme")
+        if theme not in THEMES:
+            return JsonResponse({"detail": "Tema no disponible."}, status=400)
+        UserDesignPreference.objects.update_or_create(user=request.user, defaults={"theme": theme})
+        return JsonResponse({"theme": theme})
+    if action == "recommend":
+        suggestions, ai_used = recommend_themes(data.get("description", ""), current)
+        for item in suggestions:
+            item["label"] = THEMES[item["theme"]]["label"]
+            item["colors"] = THEMES[item["theme"]]["colors"]
+        return JsonResponse({"suggestions": suggestions, "ai_used": ai_used})
+    return JsonResponse({"detail": "Acción no válida."}, status=400)

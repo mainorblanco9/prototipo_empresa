@@ -356,6 +356,20 @@ class IssuedInvoiceViewSet(GenericViewSet):
             actor=request.user,
         )
 
+    @staticmethod
+    def _issues_response(issues):
+        detail = "No se envió: " + " ".join(item["message"] for item in issues)
+        return Response(
+            {"detail": detail, "issues": issues},
+            status=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    def validate(self, request, pk=None):
+        """Valida localmente la factura sin enviarla a Hacienda."""
+        invoice = self.get_object()
+        issues = hacienda.validate_invoice(invoice)
+        return Response({"valid": not issues, "issues": issues})
+
     def queue(self, request, pk=None):
         """Asigna consecutivo y clave y deja la factura lista para el gateway."""
         invoice = self.get_object()
@@ -364,6 +378,9 @@ class IssuedInvoiceViewSet(GenericViewSet):
         version = serializer.validated_data["version"]
         if invoice.status != IssuedInvoice.Status.READY:
             return _conflict("Solo se puede enviar una factura en estado Listo para envío.")
+        issues = hacienda.validate_invoice(invoice)
+        if issues:
+            return self._issues_response(issues)
         with transaction.atomic():
             last = (
                 IssuedInvoice.objects.filter(owner=request.user)
@@ -449,6 +466,9 @@ class IssuedInvoiceViewSet(GenericViewSet):
             IssuedInvoice.Status.PROCESSING,
         ):
             return _conflict("Solo se envían facturas Listas para envío.")
+        issues = hacienda.validate_invoice(invoice)
+        if issues:
+            return self._issues_response(issues)
         token, _ = Token.objects.get_or_create(user=request.user)
         gateway_request = urllib.request.Request(
             f"{settings.GATEWAY_URL}/invoices/{invoice.pk}/submit",

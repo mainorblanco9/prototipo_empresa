@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" data-theme="{{ gb_theme }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -11,29 +11,39 @@
   {% include 'validador/_theme.html' %}
   <style>
     .gb-shell { display:grid; grid-template-columns: 250px 1fr; min-height:100vh; }
-    .gb-side { background:#fff; border-right:1px solid var(--line); padding:1.25rem 1rem; position:sticky; top:0; height:100vh; display:flex; flex-direction:column; gap:.25rem; }
+    .gb-side { background:var(--surface); border-right:1px solid var(--line); padding:1.25rem 1rem; position:sticky; top:0; height:100vh; display:flex; flex-direction:column; gap:.25rem; }
     .gb-logo { display:flex; align-items:center; gap:.5rem; font-weight:800; font-size:1.25rem; color:var(--brand-dark); text-decoration:none; margin-bottom:1.25rem; }
     .gb-logo .brand-mark { width:2.2rem; height:2.2rem; display:inline-grid; place-items:center; }
-    .gb-nav a { display:flex; align-items:center; gap:.7rem; padding:.65rem .9rem; border-radius:999px; text-decoration:none; color:#2c3e5c; font-weight:600; }
-    .gb-nav a:hover { background:#f0f6ff; }
-    .gb-nav a.on { background:#e8f1fd; color:var(--brand-dark); }
-    .gb-nav .grp { font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; color:#8795a8; margin:1rem .9rem .3rem; font-weight:700; }
+    .gb-nav a { display:flex; align-items:center; gap:.7rem; padding:.65rem .9rem; border-radius:999px; text-decoration:none; color:var(--ink); font-weight:600; }
+    .gb-nav a:hover { background:var(--soft); }
+    .gb-nav a.on { background:var(--soft2); color:var(--brand-dark); }
+    .gb-nav .grp { font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:1rem .9rem .3rem; font-weight:700; }
     .gb-main { padding:1.5rem clamp(1rem,3vw,2.5rem) 3rem; min-width:0; }
     .gb-top { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap; }
     .gb-top h1 { font-size:1.75rem; font-weight:800; letter-spacing:-.02em; margin:0; }
     .gb-user { display:flex; align-items:center; gap:.6rem; font-size:.9rem; color:var(--muted); }
-    .gb-card { background:#fff; border:1px solid var(--line); border-radius:1.25rem; box-shadow:0 8px 24px rgba(0,20,53,.05); padding:1.25rem; }
+    .gb-card { background:var(--surface); border:1px solid var(--line); border-radius:1.25rem; box-shadow:0 8px 24px var(--shadow); padding:1.25rem; }
     .gb-stat .n { font-size:2rem; font-weight:800; letter-spacing:-.03em; line-height:1.1; }
     .gb-stat .l { color:var(--muted); font-size:.85rem; font-weight:600; }
-    .gb-badge { display:inline-block; padding:.12rem .6rem; border-radius:99px; font-size:.78rem; font-weight:700; background:#e8f1fd; color:var(--brand-dark); white-space:nowrap; }
+    .gb-badge { display:inline-block; padding:.12rem .6rem; border-radius:99px; font-size:.78rem; font-weight:700; background:var(--soft2); color:var(--brand); white-space:nowrap; }
     .gb-badge.accepted { background:#dcf7e8; color:#0b6b3a; } .gb-badge.rejected { background:#fdecec; color:#b42318; }
     .gb-badge.draft, .gb-badge.cancelled { background:#eef1f5; color:#475569; } .gb-badge.ready, .gb-badge.queued, .gb-badge.processing { background:#fff4d6; color:#6b4a00; }
-    .gb-table th { font-size:.75rem; text-transform:uppercase; letter-spacing:.05em; color:#8795a8; font-weight:700; border-bottom:1px solid var(--line); }
+    .gb-table th { font-size:.75rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:700; border-bottom:1px solid var(--line); }
     .gb-table td { vertical-align:middle; }
     .gb-check { display:flex; gap:.75rem; padding:.7rem 0; border-bottom:1px solid var(--line); }
     .gb-check:last-child { border:0; }
     .gb-dot { flex:0 0 1.5rem; height:1.5rem; border-radius:50%; display:grid; place-items:center; font-size:.8rem; font-weight:800; color:#fff; }
     .gb-dot.ok { background:#12a150; } .gb-dot.bad { background:#d92d20; } .gb-dot.warn { background:#f79009; }
+    .gb-top h1:empty { display:none; }
+    .gb-tools { position:relative; }
+    .gb-themebtn { border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:999px; padding:.3rem .8rem; font-weight:700; font-size:.85rem; }
+    .gb-pop { position:absolute; right:0; top:2.6rem; z-index:50; width:min(22rem,92vw); background:var(--surface); border:1px solid var(--line); border-radius:1.25rem; box-shadow:0 18px 40px var(--shadow); padding:1rem; display:none; }
+    .gb-pop.open { display:block; }
+    .gb-sw { display:flex; flex-wrap:wrap; gap:.5rem; margin:.5rem 0 1rem; }
+    .gb-sw button { display:flex; align-items:center; gap:.4rem; border:2px solid var(--line); background:var(--surface); color:var(--ink); border-radius:999px; padding:.2rem .7rem .2rem .25rem; font-size:.8rem; font-weight:700; }
+    .gb-sw button.on { border-color:var(--brand); }
+    .gb-sw i { width:1.3rem; height:1.3rem; border-radius:50%; display:inline-block; }
+    .gb-sug { border:1px solid var(--line); border-radius:.9rem; padding:.5rem .7rem; margin-top:.5rem; display:flex; justify-content:space-between; gap:.5rem; align-items:center; font-size:.82rem; }
     @media (max-width: 991px) {
       .gb-shell { display:block; }
       .gb-side { position:static; height:auto; flex-direction:row; align-items:center; overflow-x:auto; padding:.6rem .75rem; gap:.4rem; border-right:0; border-bottom:1px solid var(--line); }
@@ -59,6 +69,8 @@
       <div class="grp">Conectar</div>
       <a href="{% url 'integrations' %}" class="{% if name == 'integrations' %}on{% endif %}">🔌 Integraciones API</a>
       <a href="{% url 'mobile_capture' %}">📱 Captura móvil</a>
+      <div class="grp">Herramientas</div>
+      <a href="{% url 'index' %}" class="{% if name == 'index' %}on{% endif %}">📊 Análisis de datos</a>
     </nav>
     <div class="gb-side-foot mt-auto small text-secondary px-2">
       <span class="gb-env">{{ gb_environment_label }}</span>
@@ -71,6 +83,16 @@
       <h1>{% block heading %}{% endblock %}</h1>
       <div class="gb-user">
         <span class="gb-env d-lg-none">{{ gb_environment_label }}</span>
+        <div class="gb-tools">
+          <button type="button" class="gb-themebtn" id="gb-themebtn" aria-expanded="false">🎨 Tema</button>
+          <div class="gb-pop" id="gb-pop" role="dialog" aria-label="Cambiar tema">
+            <strong>Tema de la aplicación</strong>
+            <div class="gb-sw" id="gb-sw">{% for t in gb_themes %}<button type="button" data-theme-key="{{ t.key }}" class="{% if t.key == gb_theme %}on{% endif %}"><i style="background:linear-gradient(135deg,{{ t.colors.1 }},{{ t.colors.2 }})"></i>{{ t.label }}</button>{% endfor %}</div>
+            <input class="form-control form-control-sm" id="gb-mood" maxlength="300" placeholder="Ej.: algo fresco y tranquilo (opcional)">
+            <button type="button" class="btn btn-primary btn-sm w-100 mt-2" id="gb-ai">✨ Recomendar con IA</button>
+            <div id="gb-sugs" aria-live="polite"></div>
+          </div>
+        </div>
         <span>{{ request.user.username }}</span>
         <form method="post" action="{% url 'logout' %}" class="m-0">{% csrf_token %}<button class="btn btn-outline-primary btn-sm" type="submit">Salir</button></form>
       </div>
@@ -79,6 +101,36 @@
   </main>
 </div>
 {% endwith %}
+<script>
+(() => {
+  const root = document.documentElement, pop = document.getElementById("gb-pop"), btn = document.getElementById("gb-themebtn");
+  const token = () => document.querySelector("[name=csrfmiddlewaretoken]").value;
+  const call = (body) => fetch("{% url 'api_design_theme' %}", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-CSRFToken": token() }, body: JSON.stringify(body) }).then(r => r.json());
+  const mark = (key) => document.querySelectorAll("#gb-sw button").forEach(b => b.classList.toggle("on", b.dataset.themeKey === key));
+  const apply = (key) => { root.dataset.theme = key; mark(key); call({ action: "save", theme: key }); };
+  btn.addEventListener("click", () => { const open = pop.classList.toggle("open"); btn.setAttribute("aria-expanded", open); });
+  document.addEventListener("click", (e) => { if (!pop.contains(e.target) && e.target !== btn) pop.classList.remove("open"); });
+  document.getElementById("gb-sw").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) apply(b.dataset.themeKey); });
+  const ai = document.getElementById("gb-ai"), box = document.getElementById("gb-sugs");
+  ai.addEventListener("click", async () => {
+    ai.disabled = true; ai.textContent = "Pensando…"; box.textContent = "";
+    try {
+      const data = await call({ action: "recommend", description: document.getElementById("gb-mood").value });
+      const note = document.createElement("div"); note.className = "small text-secondary mt-2";
+      note.textContent = data.ai_used ? "Sugerencias de la IA local:" : "IA no disponible; sugerencias por afinidad:"; box.append(note);
+      (data.suggestions || []).forEach((s) => {
+        const row = document.createElement("div"); row.className = "gb-sug";
+        const txt = document.createElement("span"); txt.textContent = `${s.label}: ${s.reason}`;
+        const go = document.createElement("button"); go.type = "button"; go.className = "btn btn-outline-primary btn-sm"; go.textContent = "Probar";
+        go.onclick = () => apply(s.theme);
+        row.append(txt, go); box.append(row);
+      });
+      if (data.suggestions && data.suggestions[0]) root.dataset.theme = data.suggestions[0].theme, mark(data.suggestions[0].theme), call({ action: "save", theme: data.suggestions[0].theme });
+    } catch (err) { box.textContent = "No se pudo obtener recomendaciones."; }
+    ai.disabled = false; ai.textContent = "✨ Recomendar con IA";
+  });
+})();
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

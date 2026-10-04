@@ -9,6 +9,9 @@ class UserDesignPreference(models.Model):
         MINIMAL = "minimal", "Minimalista"
         ABSTRACT = "abstract", "Abstracto"
         CORPORATE = "corporate", "Corporativo"
+        OCEAN = "ocean", "Océano"
+        SUNSET = "sunset", "Atardecer"
+        MIDNIGHT = "midnight", "Medianoche"
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,

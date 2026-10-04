@@ -39,7 +39,48 @@ def identification(value):
         raise HaciendaDocumentError(
             "La identificación debe tener entre 1 y 12 dígitos para generar la clave."
         )
-    return {"tipo": "01" if len(number) == 9 else "02", "numero": number}
+    return {"tipo": ID_TYPE_BY_LENGTH.get(len(number), "02"), "numero": number}
+
+
+ID_TYPE_BY_LENGTH = {9: "01", 10: "02", 11: "03", 12: "03"}
+
+
+def validate_invoice(invoice):
+    """Controles locales previos al envío. Devuelve lista de {field, message}."""
+    from datetime import date
+    from decimal import InvalidOperation
+
+    document = invoice.document or {}
+    issues = []
+
+    def add(field, message):
+        issues.append({"field": field, "message": message})
+
+    for key, label in (("issuer", "emisor"), ("receiver", "receptor")):
+        party = document.get(key) or {}
+        if not str(party.get("name", "")).strip():
+            add(key, f"Falta el nombre del {label}.")
+        number = digits_only(party.get("identification"))
+        if len(number) not in ID_TYPE_BY_LENGTH:
+            add(
+                key,
+                f"Identificación del {label} inválida ({len(number)} dígitos): usa 9 (cédula física), "
+                "10 (jurídica) u 11-12 (DIMEX).",
+            )
+    lines = document.get("lines") or []
+    if not lines:
+        add("lines", "La factura no tiene líneas de detalle.")
+    try:
+        subtotal = sum(Decimal(line["subtotal"]) for line in lines)
+        tax = sum(Decimal(line["tax_amount"]) for line in lines)
+        total = Decimal(document["totals"]["total"])
+        if abs(subtotal + tax - total) > Decimal("0.01"):
+            add("totals", "Subtotal + IVA no coincide con el total.")
+    except (KeyError, InvalidOperation, TypeError):
+        add("totals", "Los montos de la factura están incompletos.")
+    if invoice.issue_date > date.today():
+        add("issue_date", "La fecha de emisión no puede ser futura.")
+    return issues
 
 
 def build_consecutive(sequence):
