@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f7fb">
+    {% include 'validador/_pwa_head.html' %}
+    <title>Modelo y trazabilidad | AnalizadorPro</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous">
+    <style>
+      :root { --ink: #10233f; --brand: #2359d1; --teal: #00a88f; --line: #dfe7f1; }
+      body { min-height: 100vh; background: radial-gradient(ellipse at 85% 0, #e5edff 0, transparent 32rem), #f2f6fb; color: var(--ink); }
+      .page-shell { max-width: 1120px; }
+      .app-layout { display: grid; grid-template-columns: 238px minmax(0, 1fr); gap: 1.35rem; align-items: start; }
+      .app-sidebar { position: sticky; top: 5.5rem; padding: 1rem; border: 1px solid var(--line); border-radius: 1rem; background: rgba(255,255,255,.9); box-shadow: 0 12px 30px rgba(23,47,82,.06); animation: sidebar-in .5s ease-out both; }
+      .sidebar-label { margin: .4rem .65rem .65rem; color: #64748b; font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+      .side-link { display: flex; align-items: center; gap: .7rem; margin: .25rem 0; padding: .7rem .75rem; border: 1px solid transparent; border-radius: .75rem; color: #405572; font-size: .9rem; font-weight: 650; text-decoration: none; transition: transform .18s ease, background .18s ease, border-color .18s ease, color .18s ease; }
+      .side-link:hover { transform: translateX(3px); border-color: #dce7f6; background: #f4f8ff; color: var(--brand); }
+      .side-link.active { border-color: #d9e5fb; background: linear-gradient(110deg,#eaf1ff,#f5f9ff); color: var(--brand); }
+      .side-icon { display: grid; width: 1.8rem; height: 1.8rem; flex: 0 0 auto; place-items: center; border-radius: .58rem; background: #edf3fc; color: var(--brand); font-size: .74rem; font-weight: 850; }
+      .side-link.active .side-icon { background: var(--brand); color: #fff; }
+      .sidebar-note { margin-top: 1rem; padding: .8rem; border: 1px solid #e4ebf5; border-radius: .75rem; background: #f8faff; color: #64748b; font-size: .75rem; line-height: 1.5; }
+      .app-main { min-width: 0; }
+      .surface-card { border: 1px solid rgba(218, 228, 241, .9); border-radius: 1.1rem; background: rgba(255,255,255,.96); box-shadow: 0 14px 36px rgba(23, 47, 82, .07); }
+      .eyebrow { color: var(--brand); font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+      .app-navbar { background: rgba(255,255,255,.92); border-bottom: 1px solid var(--line); backdrop-filter: blur(14px); }
+      .brand-mark { display: inline-grid; width: 2.25rem; height: 2.25rem; place-items: center; border-radius: .7rem; background: linear-gradient(145deg, #eaf0ff, #d7e4ff); color: var(--brand); font-weight: 800; }
+      .hero-panel { border-radius: 1.25rem; padding: clamp(1.5rem, 4vw, 2.5rem); color: #fff; background: linear-gradient(120deg, #10233f 0%, #173a70 62%, #2458a3 100%); box-shadow: 0 20px 45px rgba(19, 49, 91, .18); }
+      .hero-panel .eyebrow { color: #9bc4ff; }
+      .hero-panel p { color: #d4e1f4; }
+      .workflow-steps { display: flex; flex-wrap: wrap; gap: .55rem; }
+      .workflow-step { display: inline-flex; align-items: center; gap: .5rem; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: .45rem .75rem; color: #c9d7e9; font-size: .82rem; }
+      .workflow-step.active { border-color: rgba(122,182,255,.55); background: rgba(122,182,255,.14); color: #fff; }
+      .workflow-step.completed { border-color: rgba(0,209,164,.4); background: rgba(0,168,143,.16); color: #d4fff4; }
+      .step-number { display: grid; width: 1.35rem; height: 1.35rem; place-items: center; border-radius: 50%; background: rgba(255,255,255,.14); font-size: .72rem; font-weight: 800; }
+      .trace-step { position: relative; padding: 0 0 1.25rem 2rem; border-left: 2px solid #dce3ef; }
+      .trace-step:last-child { border-left-color: transparent; padding-bottom: 0; }
+      .trace-dot { position: absolute; left: -.48rem; top: .1rem; width: .85rem; height: .85rem; border-radius: 50%; background: #3157d5; }
+      .trace-dot.warning { background: #d98a00; }
+      .trace-dot.pending { background: #98a2b3; }
+      .chart-row { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(100px, 2fr) auto; align-items: center; gap: .75rem; margin: .9rem 0; }
+      .chart-track { height: .85rem; overflow: hidden; border-radius: 999px; background: #e7edf5; }
+      .chart-bar { height: 100%; border-radius: inherit; background: #3157d5; }
+      .chart-bar.warning { background: #e5a32b; }
+      .chart-bar.currency { background: linear-gradient(90deg,#315fd0,#00a88f); }
+      .profile-card { height: 100%; border: 1px solid var(--line); border-radius: .85rem; padding: 1rem; background: #fff; }
+      .btn-primary { border-color: var(--brand); background: linear-gradient(115deg,#2359d1,#3675e5); box-shadow: 0 7px 16px rgba(35,89,209,.16); }
+      .app-main > header,.app-main > .alert,.app-main > section,.app-main > .row { animation: content-in .48s ease-out both; }
+      .app-main > section:nth-of-type(2) { animation-delay: .06s; }
+      .app-main > .row { animation-delay: .12s; }
+      .surface-card { transition: transform .2s ease, box-shadow .2s ease; }
+      .surface-card:hover { box-shadow: 0 17px 40px rgba(23,47,82,.09); }
+      .chart-bar { transform-origin: left; animation: bar-in .85s cubic-bezier(.2,.8,.2,1) both; }
+      @keyframes content-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes sidebar-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+      @keyframes bar-in { from { transform: scaleX(.12); opacity: .35; } to { transform: scaleX(1); opacity: 1; } }
+      @media (max-width: 991.98px) {
+        .app-layout { grid-template-columns: minmax(0,1fr); gap: .9rem; }
+        .app-sidebar { position: static; display: flex; align-items: center; gap: .4rem; overflow-x: auto; padding: .55rem; white-space: nowrap; }
+        .sidebar-label,.sidebar-note { display: none; }
+        .side-link { flex: 0 0 auto; margin: 0; }
+      }
+      @media (max-width: 575.98px) {
+        .side-link { padding: .55rem; font-size: .8rem; }
+        .side-icon { width: 1.6rem; height: 1.6rem; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,*::before,*::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+      }
+      pre { max-height: 32rem; overflow: auto; padding: 1rem; border-radius: .75rem; background: #111827; color: #e5e7eb; font-size: .85rem; }
+      @media (max-width: 575px) {
+        .chart-row { grid-template-columns: 1fr auto; gap: .35rem .75rem; }
+        .chart-track { grid-column: 1 / -1; grid-row: 2; }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar app-navbar">
+      <div class="container page-shell d-flex justify-content-between align-items-center">
+        <a class="navbar-brand d-flex align-items-center gap-2 fw-semibold mb-0" href="{% url 'index' %}">
+          <span class="brand-mark">V</span><span>Analizador<span class="text-primary">Pro</span></span>
+        </a>
+        <div class="d-flex align-items-center gap-3">
+          <span class="small text-secondary">{{ request.user.username }}</span>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'invoice_workspace' %}">Volver a facturas</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container page-shell app-layout py-4 py-lg-5">
+      <aside class="app-sidebar" aria-label="Navegación del flujo de facturas">
+        <p class="sidebar-label">Flujo de trabajo</p>
+        <a class="side-link" href="{% url 'invoice_workspace' %}">
+          <span class="side-icon">01</span><span>Analizar y validar</span>
+        </a>
+        <a class="side-link active" href="{% url 'invoice_model_workspace' %}" aria-current="page">
+          <span class="side-icon">02</span><span>Preparar modelo</span>
+        </a>
+        <a class="side-link" href="{% url 'issued_invoice_draft' %}">
+          <span class="side-icon">+</span><span>Borrador emitido</span>
+        </a>
+        <a class="side-link" href="{% url 'invoice_audit' %}">
+          <span class="side-icon">≡</span><span>Bitácora</span>
+        </a>
+        <a class="side-link" href="{% url 'index' %}">
+          <span class="side-icon">↗</span><span>Analizador general</span>
+        </a>
+        <div class="sidebar-note">
+          <strong>Entorno de demostración</strong><br>
+          El modelo es local; el envío oficial requiere el contrato de TRIBU-CR.
+        </div>
+      </aside>
+      <main class="app-main py-1">
+      <header class="mb-4">
+        <div class="hero-panel">
+          <p class="eyebrow mb-2">Paso 2 · Preparador local TRIBU-CR</p>
+          <h1 class="display-6 fw-bold mb-2">Modelo y trazabilidad</h1>
+          <p class="mb-4">Analiza gastos en CRC, consulta la bitácora y ejecuta una prueba técnica local del flujo. Aún no se emiten ni se envían comprobantes electrónicos.</p>
+          <div class="workflow-steps" aria-label="Flujo de trabajo">
+            <span class="workflow-step completed"><span class="step-number">1</span> Analizar y graficar</span>
+            <span class="workflow-step completed"><span class="step-number">2</span> Validar</span>
+            <span class="workflow-step active"><span class="step-number">3</span> Preparar modelo</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="alert alert-warning" role="status">
+        <strong>Ambiente local de preparación, no sistema emisor.</strong> Este lote de gastos de proveedores se convierte en un JSON interno de demostración. No es un XML fiscal, no representa una factura electrónica emitida y no se transmite a TRIBU-CR/Hacienda.
+      </div>
+
+      <section class="surface-card p-3 p-md-4 mb-4" aria-labelledby="trace-title">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+          <div>
+            <p class="eyebrow mb-1">Lote {{ batch.schema_version }}</p>
+            <h2 id="trace-title" class="h4 fw-bold mb-1">Trazabilidad del proceso</h2>
+            <p class="small text-secondary mb-0">{{ batch.source_file }} · Estado: {{ batch.status }}</p>
+          </div>
+          <a class="btn btn-primary" href="{% url 'download_invoice_model' %}">Descargar modelo JSON</a>
+        </div>
+        {% for step in trace_steps %}
+          <div class="trace-step">
+            <span class="trace-dot {{ step.state }}" aria-hidden="true"></span>
+            <h3 class="h6 fw-bold mb-1">{{ step.title }}</h3>
+            <p class="small text-secondary mb-0">{{ step.detail }}</p>
+          </div>
+        {% endfor %}
+        <h3 class="h6 fw-bold mt-4 mb-3">Eventos registrados de este lote</h3>
+        {% for event in audit_events %}
+          <div class="d-flex flex-wrap justify-content-between gap-2 border-top py-2 small">
+            <span><strong>{{ event.get_event_type_display }}</strong> · {{ event.result_label }}</span>
+            <time datetime="{{ event.created_at|date:'c' }}">{{ event.created_at|date:"d/m/Y H:i:s" }}</time>
+          </div>
+        {% empty %}
+          <p class="small text-secondary mb-0">Todavía no hay eventos para este lote.</p>
+        {% endfor %}
+        <a class="btn btn-sm btn-outline-secondary mt-3" href="{% url 'invoice_audit' %}">Abrir bitácora completa</a>
+      </section>
+
+      <section class="surface-card p-3 p-md-4 mb-4" aria-labelledby="document-types-title">
+        <p class="eyebrow mb-1">Alcance del producto</p>
+        <h2 id="document-types-title" class="h5 fw-bold">Tipos de comprobante electrónico de Costa Rica</h2>
+        <p class="small text-secondary">Catálogo orientativo para planificar perfiles. El prototipo no genera ni valida los esquemas fiscales de estos comprobantes. Los nombres, versiones, reglas y requisitos deben confirmarse contra la documentación vigente de Hacienda antes de implementar cada perfil.</p>
+        <div class="row g-3">
+          {% for profile in document_profiles %}
+            <div class="col-12 col-md-6 col-xl-4">
+              <article class="profile-card">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <h3 class="h6 fw-bold mb-0">{{ profile.name }}</h3>
+                  {% if profile.status == "internal_demo" %}
+                    <span class="badge text-bg-warning">Demo genérica</span>
+                  {% else %}
+                    <span class="badge text-bg-light border text-secondary">Pendiente</span>
+                  {% endif %}
+                </div>
+                <p class="small text-secondary mb-0">{{ profile.detail }}</p>
+              </article>
+            </div>
+          {% endfor %}
+        </div>
+        <p class="small mt-3 mb-0">Nota de crédito y débito, tiquete, compra y exportación necesitan estructuras y reglas propias. No se pueden representar correctamente renombrando la plantilla genérica de gastos.</p>
+      </section>
+
+      <div class="row g-4 mb-4">
+        <div class="col-12 col-lg-6">
+          <section class="surface-card h-100 p-3 p-md-4" aria-labelledby="status-chart-title">
+            <p class="eyebrow mb-1">Validación local</p>
+            <h2 id="status-chart-title" class="h5 fw-bold">Facturas por estado</h2>
+            {% for point in status_chart %}
+              <div class="chart-row">
+                <span>{{ point.label }}</span>
+                <div class="chart-track" role="img" aria-label="{{ point.value }} facturas: {{ point.label }}">
+                  <div class="chart-bar {{ point.color }}" style="width: {{ point.width }}%"></div>
+                </div>
+                <strong>{{ point.value }}</strong>
+              </div>
+            {% endfor %}
+            <p class="small text-secondary mb-0">Conteos calculados en Django a partir del resultado de las reglas de validación.</p>
+          </section>
+        </div>
+        <div class="col-12 col-lg-6">
+          <section class="surface-card h-100 p-3 p-md-4" aria-labelledby="currency-chart-title">
+            <p class="eyebrow mb-1">Importes validados · CRC</p>
+            <h2 id="currency-chart-title" class="h5 fw-bold">Total en colones</h2>
+            {% for point in currency_chart %}
+              <div class="chart-row">
+                <span>{{ point.currency }}</span>
+                <div class="chart-track" role="img" aria-label="{{ point.amount }} {{ point.currency }}">
+                  <div class="chart-bar currency" style="width: {{ point.width }}%"></div>
+                </div>
+                <strong>{{ point.amount }}</strong>
+              </div>
+            {% empty %}
+              <p class="small text-secondary">No hay importes validados para graficar.</p>
+            {% endfor %}
+            <p class="small text-secondary mb-0">En esta etapa solo se aceptan colones costarricenses (CRC). El soporte para dólares se añadirá en una etapa posterior.</p>
+          </section>
+        </div>
+      </div>
+
+      <section class="surface-card p-3 p-md-4 mb-4" aria-labelledby="ollama-title">
+        <p class="eyebrow mb-1">Asistencia local</p>
+        <h2 id="ollama-title" class="h5 fw-bold">Interpretar gráficos con Ollama</h2>
+        <p class="small text-secondary">
+          Ollama recibe solo conteos y el importe total agregado en CRC. Los gráficos se calculan localmente; no se envían facturas, proveedores ni folios al modelo.
+        </p>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="analyze">
+          <button class="btn btn-outline-primary" type="submit">Generar resumen con Ollama local</button>
+        </form>
+        {% if ai_error %}
+          <div class="alert alert-warning mt-3 mb-0" role="alert">{{ ai_error }}</div>
+        {% endif %}
+        {% if ai_insight %}
+          <div class="alert alert-info mt-3 mb-0" role="status">{{ ai_insight|linebreaksbr }}</div>
+        {% endif %}
+      </section>
+
+      {% if mock_enabled %}
+        <section id="simulation-result" class="surface-card p-3 p-md-4 mb-4" aria-labelledby="mock-title">
+          <p class="eyebrow mb-1">Prueba técnica · sin conexión externa</p>
+          <h2 id="mock-title" class="h5 fw-bold">Simular el flujo local</h2>
+          <p class="small text-secondary">
+            Comprueba que el lote listo recorre la preparación local. Esto no autentica con Hacienda, no valida contra sus XSD y no envía ni registra documentos. Un resultado superado solo significa que pasó los controles internos actuales.
+          </p>
+          <form method="post" action="#simulation-result">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="simulate">
+            <button class="btn btn-primary" type="submit">Ejecutar simulación local</button>
+          </form>
+          {% if mock_error %}
+            <div class="alert alert-warning mt-3 mb-0" role="alert">{{ mock_error }}</div>
+          {% endif %}
+          {% if mock_result %}
+            <div class="alert {% if mock_result.status == 'simulation_passed' %}alert-success{% else %}alert-warning{% endif %} mt-3" role="status">
+              <strong>{% if mock_result.status == "simulation_passed" %}Simulación local superada{% else %}Simulación local bloqueada{% endif %}</strong>
+              <div>{{ mock_result.message }}</div>
+              <div class="mt-2">{{ mock_result.simulated_ready_count }} registros superaron los controles de demostración · {{ mock_result.blocked_count }} bloqueados.</div>
+              <div class="small mt-1">Referencia técnica local: <code>{{ mock_result.simulation_id }}</code> · Sin acuse fiscal ni comunicación con Hacienda.</div>
+            </div>
+            <details>
+              <summary class="fw-semibold">Ver detalle técnico de la simulación (JSON)</summary>
+              <pre class="mt-3 mb-0"><code>{{ mock_json }}</code></pre>
+            </details>
+          {% endif %}
+        </section>
+      {% endif %}
+
+      <section class="alert alert-secondary" aria-labelledby="real-submit-title">
+        <h2 id="real-submit-title" class="h6 fw-bold">Envío real a Hacienda: todavía no disponible</h2>
+        <p class="small mb-2">Falta definir los datos del emisor y receptor, líneas y códigos CABYS, perfiles por tipo de comprobante, XML/XSD de la versión vigente, firma/autenticación, ambiente de pruebas, recepción de respuestas y manejo de reintentos.</p>
+        <p class="small mb-0">La <a href="https://www.hacienda.go.cr/TRIBU-CR.html" target="_blank" rel="noopener noreferrer">página de TRIBU-CR de Hacienda</a> y la <a href="https://api.hacienda.go.cr/docs/" target="_blank" rel="noopener noreferrer">documentación de API pública</a> no bastan por sí solas para inferir un contrato de remisión. No se habilitará un envío real sin especificación oficial confirmada.</p>
+      </section>
+
+      <details class="surface-card p-3 p-md-4">
+        <summary class="fw-semibold">Ver contenido del modelo preparado</summary>
+        <pre class="mt-3 mb-0"><code>{{ batch_json }}</code></pre>
+      </details>
+      </main>
+    </div>
+  </body>
+</html>

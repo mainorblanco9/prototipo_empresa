@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f5f7fb">
+    {% include 'validador/_pwa_head.html' %}
     <title>Analizador de datos | Operaciones</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
@@ -138,6 +139,10 @@
       .chart-point { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(80px, 3fr) auto; align-items: center; gap: .75rem; }
       .chart-track { height: .8rem; overflow: hidden; border-radius: 999px; background: var(--line); }
       .chart-bar { height: 100%; min-width: 2px; border-radius: inherit; background: var(--brand); }
+      .chart-track.monthly { position: relative; overflow: visible; background: var(--line); }
+      .chart-zero { position: absolute; z-index: 1; top: -.2rem; bottom: -.2rem; left: 50%; width: 1px; background: var(--muted); }
+      .chart-bar.monthly { position: absolute; top: 0; min-width: 0; }
+      .chart-bar.negative { background: #d64545; }
       body[data-theme="abstract"] .chart-track { background: #393650; }
     </style>
   </head>
@@ -151,12 +156,16 @@
         <div class="d-flex align-items-center gap-3">
           <span class="small text-secondary d-none d-sm-inline">{{ request.user.username }}</span>
           <a class="btn btn-sm btn-outline-primary" href="{% url 'design_preferences' %}">Cambiar diseño</a>
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'invoice_workspace' %}">Preparar facturas</a>
           <span class="badge rounded-pill text-bg-light border text-secondary fw-medium">Prototipo interno</span>
           <form method="post" action="{% url 'logout' %}">
             {% csrf_token %}
             <button class="btn btn-sm btn-outline-secondary" type="submit">Cerrar sesión</button>
           </form>
         </div>
+        {% if source_sheet %}
+          <p class="small text-secondary mb-3">Hoja analizada: <strong>{{ source_sheet }}</strong></p>
+        {% endif %}
       </div>
     </nav>
 
@@ -170,7 +179,7 @@
         <p class="eyebrow mb-2">Operaciones · Análisis de datos</p>
         <h1 class="display-6 fw-bold mb-2">Analizador de datos</h1>
         <p class="text-secondary mb-0">
-          Carga tablas CSV, TSV o Excel. La aplicación detecta sus columnas y Ollama recomienda una gráfica.
+        Carga tablas CSV, TSV o Excel. La aplicación interpreta su estructura y Ollama recomienda cómo visualizarla.
         </p>
       </header>
 
@@ -181,7 +190,7 @@
               <span class="upload-icon" aria-hidden="true">↑</span>
               <div>
                 <h2 class="h5 fw-bold mb-1">Cargar tabla</h2>
-                <p class="small text-secondary mb-0">Elige una tabla con encabezados en la primera fila.</p>
+                <p class="small text-secondary mb-0">Detecta encabezados desplazados, hojas múltiples y tablas mensuales en Excel.</p>
               </div>
             </div>
 
@@ -226,7 +235,7 @@
               <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
                 <div>
                   <p class="eyebrow mb-1">Resultado del análisis</p>
-                  <h2 class="h4 fw-bold mb-0">Resumen del análisis</h2>
+                  <h2 class="h4 fw-bold mb-0">{% if expense_validation %}Resumen de validación{% else %}Resumen del análisis{% endif %}</h2>
                 </div>
                 {% if report_url %}
                   <a class="btn btn-outline-primary fw-semibold" href="{{ report_url }}">Descargar CSV</a>
@@ -264,23 +273,64 @@
                 <section class="surface-card p-3 mb-4" aria-labelledby="chart-title">
                   <div class="mb-3">
                     <p class="eyebrow mb-1">Gráfico sugerido por {{ recommendation_source }}</p>
-                    <h3 id="chart-title" class="h5 fw-bold mb-0">{{ chart.title }}</h3>
+                    <h3 id="chart-title" class="h5 fw-bold mb-0" {% if matrix_chart %}data-monthly-title{% endif %}>{{ chart.title }}</h3>
                   </div>
-                  <div class="d-grid gap-2" role="img" aria-label="{{ chart.title }}">
-                    {% for point in chart.points %}
-                      <div class="chart-point">
-                        <span class="small text-truncate" title="{{ point.label }}">{{ point.label }}</span>
-                        <div class="chart-track" aria-hidden="true">
-                          <div class="chart-bar" style="width: {{ point.width }}%"></div>
+                  {% if matrix_chart %}
+                    {% if matrix_chart.sheets|length > 1 %}
+                      <label class="form-label small fw-semibold" for="monthly-sheet">Hoja para el gráfico</label>
+                      <select id="monthly-sheet" class="form-select mb-3">
+                        {% for sheet in matrix_chart.sheets %}
+                          <option value="{{ sheet.sheet_name }}" {% if sheet.sheet_name == matrix_chart.selected_sheet %}selected{% endif %}>{{ sheet.sheet_name }}</option>
+                        {% endfor %}
+                      </select>
+                    {% endif %}
+                    <label class="form-label small fw-semibold" for="monthly-series">Indicador para comparar por mes</label>
+                    <select id="monthly-series" class="form-select mb-3">
+                      {% for series in matrix_chart.series %}
+                        <option value="{{ forloop.counter0 }}" {% if forloop.counter0 == matrix_chart.selected_index %}selected{% endif %}>{{ series.label }}</option>
+                      {% endfor %}
+                    </select>
+                    <div class="d-grid gap-2" role="img" aria-label="{{ chart.title }}" data-monthly-points>
+                      {% for point in chart.points %}
+                        <div class="chart-point">
+                          <span class="small text-truncate" title="{{ point.label }}">{{ point.label }}</span>
+                          <div class="chart-track monthly" aria-hidden="true">
+                            <span class="chart-zero"></span>
+                            <span class="chart-bar monthly{% if point.value < 0 %} negative{% endif %}" style="left: {% if point.value < 0 %}calc(50% - {{ point.width }}%){% else %}50%{% endif %}; width: {{ point.width }}%"></span>
+                          </div>
+                          <strong class="small">{{ point.value }}</strong>
                         </div>
-                        <strong class="small">{{ point.value }}</strong>
-                      </div>
-                    {% endfor %}
-                  </div>
-                  <p class="small text-secondary mt-3 mb-0">Eje: {{ chart.x_label }} · Medida: {{ chart.y_label }}.</p>
+                      {% endfor %}
+                    </div>
+                    <p class="small text-secondary mt-3 mb-0" data-monthly-description>Eje: Mes · Medida: {{ chart.y_label }}. El gráfico respeta el orden de los meses y muestra valores negativos respecto a cero. Cambiar hoja o indicador actualiza la visualización en tu navegador, sin otra consulta a la IA.</p>
+                    {{ matrix_chart|json_script:"monthly-chart-data" }}
+                  {% else %}
+                    <div class="d-grid gap-2" role="img" aria-label="{{ chart.title }}">
+                      {% for point in chart.points %}
+                        <div class="chart-point">
+                          <span class="small text-truncate" title="{{ point.label }}">{{ point.label }}</span>
+                          <div class="chart-track" aria-hidden="true">
+                            <div class="chart-bar" style="width: {{ point.width }}%"></div>
+                          </div>
+                          <strong class="small">{{ point.value }}</strong>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                  {% if not matrix_chart %}
+                    <p class="small text-secondary mt-3 mb-0">Eje: {{ chart.x_label }} · Medida: {{ chart.y_label }}.</p>
+                  {% endif %}
                 </section>
               {% elif total_rows %}
                 <div class="alert alert-info">No se encontraron datos suficientes para crear un gráfico.</div>
+              {% endif %}
+
+              {% if columns %}
+                <div class="d-flex flex-wrap gap-2 mb-4" aria-label="Tipos de columna detectados">
+                  {% for column in columns %}
+                    <span class="badge rounded-pill text-bg-light border">{{ column.display_name }} · {{ column.type_label }}</span>
+                  {% endfor %}
+                </div>
               {% endif %}
 
               {% if expense_validation and issue_counts %}
@@ -336,7 +386,7 @@
                       </tr>
                     </thead>
                     <tbody>
-                      {% for row in rows %}
+                      {% for row in table_preview_rows %}
                         <tr>{% for value in row %}<td>{{ value }}</td>{% endfor %}</tr>
                       {% endfor %}
                     </tbody>
@@ -359,12 +409,12 @@
               </div>
               <div class="d-flex gap-3">
                 <span class="badge rounded-pill text-bg-primary align-self-start">3</span>
-                <div><h3 class="h6 fw-bold mb-1">Visualiza tendencias</h3><p class="text-secondary small mb-0">Consulta un gráfico y descarga la tabla dinámica.</p></div>
+                <div><h3 class="h6 fw-bold mb-1">Visualiza tendencias</h3><p class="text-secondary small mb-0">Consulta un gráfico y descarga la tabla.</p></div>
               </div>
               <hr class="my-4">
               <h3 class="h6 fw-bold">Ejemplo de CSV</h3>
               <pre class="bg-light border rounded-3 p-3 small mb-0"><code>fecha,proveedor,numero_factura,moneda,subtotal,impuesto,total
-2026-09-01,Proveedor Ejemplo,F-001,MXN,1000,160,1160</code></pre>
+2026-09-01,Proveedor Ejemplo,F-001,CRC,1000,160,1160</code></pre>
             </section>
           {% endif %}
         </div>
@@ -373,5 +423,77 @@
         Prototipo local · Verifica los resultados antes de registrarlos en sistemas empresariales.
       </footer>
     </main>
+    {% if matrix_chart %}
+      <script>
+        (() => {
+          const payload = JSON.parse(document.getElementById("monthly-chart-data").textContent);
+          const selector = document.getElementById("monthly-series");
+          const sheetSelector = document.getElementById("monthly-sheet");
+          const pointsContainer = document.querySelector("[data-monthly-points]");
+          const title = document.querySelector("[data-monthly-title]");
+          const description = document.querySelector("[data-monthly-description]");
+          const numberFormat = new Intl.NumberFormat("es-CR", { maximumFractionDigits: 2 });
+          let currentSheet = payload.sheets.find((sheet) => sheet.sheet_name === payload.selected_sheet);
+
+          function renderSeriesOptions() {
+            selector.replaceChildren();
+            currentSheet.series.forEach((series, index) => {
+              const option = document.createElement("option");
+              option.value = String(index);
+              option.textContent = series.label;
+              selector.append(option);
+            });
+            selector.value = String(currentSheet.selected_index);
+          }
+
+          function renderMonthlyChart() {
+            const series = currentSheet.series[Number(selector.value)];
+            if (!series) return;
+            const maximum = Math.max(...series.values.map((value) => Math.abs(value)), 0) || 1;
+            title.textContent = `${series.label} por mes`;
+            pointsContainer.setAttribute("aria-label", title.textContent);
+            description.textContent = `Hoja: ${currentSheet.sheet_name} · Eje: Mes · Medida: ${series.label}. Cambiar hoja o indicador actualiza la visualización en tu navegador, sin otra consulta a la IA.`;
+            pointsContainer.replaceChildren();
+            currentSheet.months.forEach((month, index) => {
+              const value = Number(series.values[index]) || 0;
+              const width = Math.abs(value) / maximum * 50;
+              const point = document.createElement("div");
+              point.className = "chart-point";
+              const label = document.createElement("span");
+              label.className = "small text-truncate";
+              label.textContent = month;
+              label.title = month;
+              const track = document.createElement("div");
+              track.className = "chart-track monthly";
+              track.setAttribute("aria-hidden", "true");
+              const zero = document.createElement("span");
+              zero.className = "chart-zero";
+              const bar = document.createElement("span");
+              bar.className = `chart-bar monthly${value < 0 ? " negative" : ""}`;
+              bar.style.left = value < 0 ? `calc(50% - ${width}%)` : "50%";
+              bar.style.width = `${width}%`;
+              track.append(zero, bar);
+              const amount = document.createElement("strong");
+              amount.className = "small";
+              amount.textContent = numberFormat.format(value);
+              point.append(label, track, amount);
+              pointsContainer.append(point);
+            });
+          }
+
+          selector.addEventListener("change", renderMonthlyChart);
+          if (sheetSelector) {
+            sheetSelector.addEventListener("change", () => {
+              currentSheet = payload.sheets.find(
+                (sheet) => sheet.sheet_name === sheetSelector.value
+              );
+              if (!currentSheet) return;
+              renderSeriesOptions();
+              renderMonthlyChart();
+            });
+          }
+        })();
+      </script>
+    {% endif %}
   </body>
 </html>

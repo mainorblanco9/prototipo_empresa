@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#2359d1">
+    <title>Sin conexión | AnalizadorPro</title>
+    <style>
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f2f6fb; color: #10233f; font-family: system-ui, sans-serif; }
+      main { max-width: 26rem; padding: 2rem; text-align: center; }
+      img { width: 4rem; height: 4rem; }
+      button { padding: .7rem 1.2rem; border: 0; border-radius: .7rem; background: #2359d1; color: #fff; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/icon.svg" alt="">
+      <h1>Sin conexión</h1>
+      <p>No se pudo llegar al servidor local. Por seguridad, los datos de facturas no se guardan sin conexión en el navegador. Verifica que el servidor esté activo y vuelve a intentarlo.</p>
+      <button type="button" onclick="location.reload()">Reintentar</button>
+    </main>
+  </body>
+</html>

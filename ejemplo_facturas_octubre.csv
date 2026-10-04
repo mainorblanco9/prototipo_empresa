@@ -1,0 +1,4 @@
+fecha,proveedor,numero_factura,moneda,subtotal,impuesto,total
+2026-10-01,Hotel Bahía Verde,F-CR-2026-1001,CRC,150000,19500,169500
+2026-10-02,Restaurante Osa Norte,F-CR-2026-1002,CRC,85000,11050,96050
+2026-10-03,Servicios Ticos del Sur,F-CR-2026-1003,CRC,42500,5525,48025

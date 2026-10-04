@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f7fb">
+    {% include 'validador/_pwa_head.html' %}
+    <title>Borrador de factura emitida | AnalizadorPro</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous">
+    <style>
+      :root { --ink: #10233f; --brand: #2359d1; --line: #dfe7f1; --muted: #64748b; }
+      body { min-height: 100vh; background: radial-gradient(ellipse at 85% 0, #e5edff 0, transparent 32rem), #f2f6fb; color: var(--ink); }
+      .page-shell { max-width: 1180px; }
+      .app-layout { display: grid; grid-template-columns: 238px minmax(0, 1fr); gap: 1.35rem; align-items: start; }
+      .app-sidebar,.surface-card { border: 1px solid rgba(218,228,241,.95); border-radius: 1rem; background: rgba(255,255,255,.96); box-shadow: 0 14px 36px rgba(23,47,82,.07); }
+      .app-sidebar { position: sticky; top: 1rem; padding: 1rem; }
+      .sidebar-label { margin: .4rem .65rem .65rem; color: var(--muted); font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+      .side-link { display: flex; align-items: center; gap: .7rem; margin: .25rem 0; padding: .7rem .75rem; border: 1px solid transparent; border-radius: .75rem; color: #405572; font-size: .9rem; font-weight: 650; text-decoration: none; }
+      .side-link:hover,.side-link.active { border-color: #d9e5fb; background: #edf3ff; color: var(--brand); }
+      .side-icon,.brand-mark { display: inline-grid; width: 2rem; height: 2rem; place-items: center; border-radius: .65rem; background: #eaf0ff; color: var(--brand); font-weight: 800; }
+      .sidebar-note { margin-top: 1rem; padding: .8rem; border: 1px solid #e4ebf5; border-radius: .75rem; background: #f8faff; color: var(--muted); font-size: .75rem; line-height: 1.5; }
+      .app-navbar { background: rgba(255,255,255,.92); border-bottom: 1px solid var(--line); }
+      .hero-panel { border-radius: 1.25rem; padding: clamp(1.5rem,4vw,2.5rem); color: #fff; background: linear-gradient(120deg,#10233f 0%,#173a70 62%,#2458a3 100%); }
+      .hero-panel .eyebrow { color: #9bc4ff; font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+      .hero-panel p { color: #d4e1f4; }
+      .form-control { border-color: #d7e1ed; border-radius: .65rem; }
+      .table-responsive { border: 1px solid var(--line); border-radius: .8rem; }
+      .line-table { min-width: 720px; }
+      .line-table th { font-size: .78rem; }
+      .summary-total { border-radius: .9rem; padding: 1rem; background: #eff5ff; }
+      .btn-primary { border-color: var(--brand); background: linear-gradient(115deg,#2359d1,#3675e5); }
+      pre { max-height: 32rem; overflow: auto; padding: 1rem; border-radius: .75rem; background: #111827; color: #e5e7eb; font-size: .85rem; }
+      @media (max-width: 991.98px) {
+        .app-layout { grid-template-columns: minmax(0,1fr); gap: .9rem; }
+        .app-sidebar { position: static; display: flex; gap: .35rem; overflow-x: auto; padding: .55rem; white-space: nowrap; }
+        .sidebar-label,.sidebar-note { display: none; }
+        .side-link { flex: 0 0 auto; margin: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar app-navbar">
+      <div class="container page-shell d-flex justify-content-between align-items-center">
+        <a class="navbar-brand d-flex align-items-center gap-2 fw-semibold mb-0" href="{% url 'invoice_workspace' %}">
+          <span class="brand-mark">V</span><span>Analizador<span class="text-primary">Pro</span></span>
+        </a>
+        <div class="d-flex align-items-center gap-3">
+          <span class="small text-secondary">{{ request.user.username }}</span>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'invoice_workspace' %}">Análisis de gastos</a>
+        </div>
+      </div>
+    </nav>
+    <div class="container page-shell app-layout py-4 py-lg-5">
+      <aside class="app-sidebar" aria-label="Navegación del flujo de facturas">
+        <p class="sidebar-label">Flujos independientes</p>
+        <a class="side-link" href="{% url 'invoice_workspace' %}"><span class="side-icon">01</span><span>Analizar gastos recibidos</span></a>
+        <a class="side-link" href="{% url 'invoice_model_workspace' %}"><span class="side-icon">02</span><span>Modelo y trazabilidad</span></a>
+        <a class="side-link active" href="{% url 'issued_invoice_draft' %}" aria-current="page"><span class="side-icon">+</span><span>Borrador emitido</span></a>
+        <a class="side-link" href="{% url 'invoice_audit' %}"><span class="side-icon">≡</span><span>Bitácora</span></a>
+        <div class="sidebar-note"><strong>No es un emisor fiscal</strong><br>El envío real no está conectado. Los datos de este borrador permanecen en caché local por 10 minutos.</div>
+      </aside>
+      <main class="app-main">
+        <header class="hero-panel mb-4">
+          <p class="eyebrow mb-2">Flujo separado · comprobante emitido</p>
+          <h1 class="display-6 fw-bold mb-2">Borrador de factura electrónica</h1>
+          <p class="mb-0">Captura local de emisor, receptor y detalle en colones costarricenses. Este borrador no es una factura electrónica válida ni se remite a Hacienda.</p>
+        </header>
+
+        <div class="alert alert-warning" role="status">
+          <strong>Preparación interna 0.2.</strong> Calculamos automáticamente el IVA incluido según la tarifa seleccionada y comprobamos campos y aritmética. No hay consecutivo oficial, clave numérica, firma digital, código CABYS, XML/XSD ni validación de requisitos tributarios de TRIBU-CR.
+        </div>
+
+        {% if error %}
+          <div class="alert alert-danger" role="alert">{{ error }}</div>
+        {% endif %}
+
+        <section class="surface-card p-3 p-md-4 mb-4" aria-labelledby="issued-form-title">
+          <h2 id="issued-form-title" class="h4 fw-bold">Datos para el borrador</h2>
+          <p class="small text-secondary">Los campos de identificación se guardan como texto y no se validan contra formatos oficiales. Ingresa el precio final con IVA incluido y selecciona la tarifa por línea; el prototipo separará automáticamente la base y el impuesto. Confirma la tarifa aplicable según cada bien o servicio.</p>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="prepare">
+            <div class="row g-3 mb-4">
+              <div class="col-12 col-md-6">
+                <h3 class="h6 fw-bold">Emisor</h3>
+                <label class="form-label small fw-semibold" for="issuer-name">Nombre o razón social</label>
+                <input class="form-control mb-2" id="issuer-name" name="issuer_name" required value="{{ form_values.issuer_name }}">
+                <label class="form-label small fw-semibold" for="issuer-id">Identificación (texto)</label>
+                <input class="form-control" id="issuer-id" name="issuer_id" required value="{{ form_values.issuer_id }}">
+              </div>
+              <div class="col-12 col-md-6">
+                <h3 class="h6 fw-bold">Receptor</h3>
+                <label class="form-label small fw-semibold" for="receiver-name">Nombre o razón social</label>
+                <input class="form-control mb-2" id="receiver-name" name="receiver_name" required value="{{ form_values.receiver_name }}">
+                <label class="form-label small fw-semibold" for="receiver-id">Identificación (texto)</label>
+                <input class="form-control" id="receiver-id" name="receiver_id" required value="{{ form_values.receiver_id }}">
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label small fw-semibold" for="issue-date">Fecha del borrador</label>
+                <input class="form-control" type="date" id="issue-date" name="issue_date" required value="{{ form_values.issue_date|default:today }}">
+              </div>
+              <div class="col-12">
+                <span class="badge rounded-pill text-bg-light border">Moneda fija: CRC · Colón costarricense</span>
+              </div>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+              <div>
+                <h3 class="h5 fw-bold mb-0">Líneas de detalle</h3>
+                <p class="small text-secondary mb-0">El precio incluye IVA. Separamos automáticamente el impuesto incluido según la tarifa seleccionada; esto no implica cumplimiento fiscal.</p>
+              </div>
+              <button class="btn btn-sm btn-outline-primary" id="add-line" type="button">Agregar línea</button>
+            </div>
+            <div class="table-responsive mb-3">
+              <table class="table table-sm align-middle line-table mb-0">
+                <thead class="table-light"><tr><th>Descripción</th><th>Cantidad</th><th>Precio unitario con IVA · CRC</th><th>Tarifa IVA</th><th>IVA incluido · CRC</th><th></th></tr></thead>
+                <tbody id="invoice-lines">
+                  {% if line_values %}
+                    {% for line in line_values %}
+                      <tr>
+                        <td><input class="form-control form-control-sm" name="line_description" required maxlength="250" value="{{ line.description }}"></td>
+                        <td><input class="form-control form-control-sm line-quantity" type="number" name="line_quantity" min="0.001" step="0.001" required value="{{ line.quantity }}"></td>
+                        <td><input class="form-control form-control-sm line-unit-price" type="number" name="line_unit_price" min="0" step="0.01" required value="{{ line.unit_price }}"></td>
+                        <td>
+                          <select class="form-select form-select-sm line-tax-rate" name="line_tax_rate" required>
+                            <option value="13" {% if line.tax_rate == "13" or not line.tax_rate %}selected{% endif %}>13% (predeterminada)</option>
+                            <option value="4" {% if line.tax_rate == "4" %}selected{% endif %}>4%</option>
+                            <option value="2" {% if line.tax_rate == "2" %}selected{% endif %}>2%</option>
+                            <option value="1" {% if line.tax_rate == "1" %}selected{% endif %}>1%</option>
+                            <option value="0" {% if line.tax_rate == "0" %}selected{% endif %}>0%</option>
+                            <option value="exempt" {% if line.tax_rate == "exempt" %}selected{% endif %}>Exento</option>
+                          </select>
+                        </td>
+                        <td class="line-tax-preview">₡0,00</td>
+                        <td><button class="btn btn-sm btn-outline-danger remove-line" type="button" aria-label="Eliminar línea">×</button></td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr>
+                      <td><input class="form-control form-control-sm" name="line_description" required maxlength="250" placeholder="Descripción del producto o servicio"></td>
+                      <td><input class="form-control form-control-sm line-quantity" type="number" name="line_quantity" min="0.001" step="0.001" required value="1"></td>
+                      <td><input class="form-control form-control-sm line-unit-price" type="number" name="line_unit_price" min="0" step="0.01" required placeholder="0.00"></td>
+                      <td>
+                        <select class="form-select form-select-sm line-tax-rate" name="line_tax_rate" required>
+                          <option value="13" selected>13% (predeterminada)</option>
+                          <option value="4">4%</option>
+                          <option value="2">2%</option>
+                          <option value="1">1%</option>
+                          <option value="0">0%</option>
+                          <option value="exempt">Exento</option>
+                        </select>
+                      </td>
+                      <td class="line-tax-preview">₡0,00</td>
+                      <td><button class="btn btn-sm btn-outline-danger remove-line" type="button" aria-label="Eliminar línea">×</button></td>
+                    </tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+            <div class="summary-total ms-auto mb-3" style="max-width: 25rem">
+              <div class="d-flex justify-content-between"><span>Subtotal antes de IVA</span><strong id="draft-subtotal">₡0,00</strong></div>
+              <div class="d-flex justify-content-between"><span>IVA incluido (calculado)</span><strong id="draft-tax">₡0,00</strong></div>
+              <hr>
+              <div class="d-flex justify-content-between fs-5"><span>Total calculado</span><strong id="draft-total">₡0,00</strong></div>
+            </div>
+            <button class="btn btn-primary" type="submit">Preparar borrador local</button>
+          </form>
+        </section>
+
+        {% if draft %}
+          <section class="surface-card p-3 p-md-4 mb-4" aria-labelledby="draft-result-title">
+            <div class="d-flex flex-wrap justify-content-between gap-3 align-items-start">
+              <div>
+                <span class="badge text-bg-success">Borrador calculado localmente</span>
+                <h2 id="draft-result-title" class="h4 fw-bold mt-2">Factura electrónica · solo borrador</h2>
+                <p class="small text-secondary mb-0">Referencia local {{ draft.draft_id }} · {{ draft.lines|length }} líneas · CRC {{ draft.totals.total }}</p>
+              </div>
+              <a class="btn btn-outline-primary" href="{% url 'download_issued_invoice_draft' %}">Descargar JSON interno</a>
+            </div>
+            <div class="alert alert-warning mt-3 mb-0" role="status">Este resultado no es un comprobante tributario, no certifica requisitos y no se envió a Hacienda. La bitácora conserva solo metadatos, no los datos del borrador.</div>
+            <details class="mt-3">
+              <summary class="fw-semibold">Ver modelo interno 0.2.0</summary>
+              <pre class="mt-3 mb-0"><code>{{ draft_json }}</code></pre>
+            </details>
+          </section>
+        {% endif %}
+      </main>
+    </div>
+    <template id="invoice-line-template">
+      <tr>
+        <td><input class="form-control form-control-sm" name="line_description" required maxlength="250" placeholder="Descripción del producto o servicio"></td>
+        <td><input class="form-control form-control-sm line-quantity" type="number" name="line_quantity" min="0.001" step="0.001" required value="1"></td>
+        <td><input class="form-control form-control-sm line-unit-price" type="number" name="line_unit_price" min="0" step="0.01" required placeholder="0.00"></td>
+        <td>
+          <select class="form-select form-select-sm line-tax-rate" name="line_tax_rate" required>
+            <option value="13" selected>13% (predeterminada)</option>
+            <option value="4">4%</option>
+            <option value="2">2%</option>
+            <option value="1">1%</option>
+            <option value="0">0%</option>
+            <option value="exempt">Exento</option>
+          </select>
+        </td>
+        <td class="line-tax-preview">₡0,00</td>
+        <td><button class="btn btn-sm btn-outline-danger remove-line" type="button" aria-label="Eliminar línea">×</button></td>
+      </tr>
+    </template>
+    <script>
+      (() => {
+        const lines = document.getElementById("invoice-lines");
+        const money = new Intl.NumberFormat("es-CR", {
+          style: "currency",
+          currency: "CRC",
+          maximumFractionDigits: 2
+        });
+        const roundMoney = amount => Math.round((amount + Number.EPSILON) * 100) / 100;
+        const recalculate = () => {
+          let subtotal = 0;
+          let tax = 0;
+          for (const row of lines.rows) {
+            const quantity = Number(row.querySelector(".line-quantity").value) || 0;
+            const price = Number(row.querySelector(".line-unit-price").value) || 0;
+            const rateValue = row.querySelector(".line-tax-rate").value;
+            const rate = rateValue === "exempt" ? 0 : Number(rateValue);
+            const gross = roundMoney(quantity * price);
+            const lineTax = rate ? roundMoney(gross * rate / (100 + rate)) : 0;
+            const lineSubtotal = gross - lineTax;
+            row.querySelector(".line-tax-preview").textContent = money.format(lineTax);
+            subtotal += lineSubtotal;
+            tax += lineTax;
+          }
+          document.getElementById("draft-subtotal").textContent = money.format(roundMoney(subtotal));
+          document.getElementById("draft-tax").textContent = money.format(roundMoney(tax));
+          document.getElementById("draft-total").textContent = money.format(roundMoney(subtotal + tax));
+        };
+        document.getElementById("add-line").addEventListener("click", () => {
+          if (lines.rows.length >= 100) return;
+          lines.append(document.getElementById("invoice-line-template").content.cloneNode(true));
+          recalculate();
+        });
+        lines.addEventListener("input", recalculate);
+        lines.addEventListener("change", recalculate);
+        lines.addEventListener("click", event => {
+          if (!event.target.classList.contains("remove-line")) return;
+          if (lines.rows.length === 1) {
+            lines.rows[0].querySelectorAll("input").forEach(input => { input.value = ""; });
+          } else {
+            event.target.closest("tr").remove();
+          }
+          recalculate();
+        });
+        recalculate();
+      })();
+    </script>
+  </body>
+</html>

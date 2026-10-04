@@ -1,6 +1,7 @@
 from django.conf import settings
 from openai import OpenAI, OpenAIError
 import requests
+from urllib.parse import urlparse
 
 
 class AIProviderError(RuntimeError):
@@ -25,18 +26,56 @@ def ai_provider_label():
     return "proveedor de IA no válido"
 
 
-def generate_text(system_prompt, user_prompt, max_tokens=None):
+def generate_text(system_prompt, user_prompt, max_tokens=None, json_mode=False):
     provider = settings.AI_PROVIDER.lower()
     if provider == "ollama":
-        return _generate_with_ollama(system_prompt, user_prompt, max_tokens)
+        return _generate_with_ollama(
+            system_prompt,
+            user_prompt,
+            max_tokens,
+            json_mode,
+        )
     if provider == "openai":
-        return _generate_with_openai(system_prompt, user_prompt, max_tokens)
+        return _generate_with_openai(
+            system_prompt,
+            user_prompt,
+            max_tokens,
+            json_mode,
+        )
     raise AIProviderError(
         "AI_PROVIDER debe ser 'ollama' o 'openai'."
     )
 
 
-def _generate_with_ollama(system_prompt, user_prompt, max_tokens):
+def generate_local_text(
+    system_prompt,
+    user_prompt,
+    max_tokens=None,
+    json_mode=False,
+    json_schema=None,
+):
+    parsed_url = urlparse(settings.OLLAMA_BASE_URL)
+    if parsed_url.hostname not in ("localhost", "127.0.0.1", "::1"):
+        raise AIProviderError(
+            "La interpretación de documentos requiere Ollama en este computador. "
+            "OLLAMA_BASE_URL debe apuntar a localhost."
+        )
+    return _generate_with_ollama(
+        system_prompt,
+        user_prompt,
+        max_tokens,
+        json_mode,
+        json_schema,
+    )
+
+
+def _generate_with_ollama(
+    system_prompt,
+    user_prompt,
+    max_tokens,
+    json_mode,
+    json_schema=None,
+):
     url = f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/chat"
     payload = {
         "model": settings.OLLAMA_MODEL,
@@ -48,6 +87,10 @@ def _generate_with_ollama(system_prompt, user_prompt, max_tokens):
     }
     if max_tokens is not None:
         payload["options"] = {"num_predict": max_tokens}
+    if json_schema is not None:
+        payload["format"] = json_schema
+    elif json_mode:
+        payload["format"] = "json"
 
     try:
         response = requests.post(
@@ -72,7 +115,7 @@ def _generate_with_ollama(system_prompt, user_prompt, max_tokens):
     return content.strip()
 
 
-def _generate_with_openai(system_prompt, user_prompt, max_tokens):
+def _generate_with_openai(system_prompt, user_prompt, max_tokens, json_mode):
     if not settings.OPENAI_API_KEY:
         raise AIProviderError(
             "Configura OPENAI_API_KEY o selecciona AI_PROVIDER=ollama."
@@ -87,6 +130,8 @@ def _generate_with_openai(system_prompt, user_prompt, max_tokens):
         }
         if max_tokens is not None:
             options["max_output_tokens"] = max_tokens
+        if json_mode:
+            options["text"] = {"format": {"type": "json_object"}}
         response = client.responses.create(**options)
     except OpenAIError as exc:
         raise AIProviderError(

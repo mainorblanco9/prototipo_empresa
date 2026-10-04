@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
@@ -15,19 +13,19 @@ headers = [
     "total",
 ]
 rows_with_errors = [
-    ["2026-09-01", "Papelería Central", "FAC-1001", "MXN", 1000, 160, 1160],
-    ["02/09/2026", "Servicios del Norte", "FAC-2048", "MXN", 2500, 400, 2900],
-    ["2026-09-03", "Café y Oficina", "FAC-3307", "MXN", 450, 72, 522],
-    ["2026-09-04", "Papelería Central", "FAC-1001", "MXN", 1000, 160, 1160],
-    ["fecha-invalida", "Transporte Ejemplo", "FAC-4110", "MXN", 800, 128, 950],
-    ["2026-09-06", "", "FAC-5112", "MXN", 300, 48, 348],
-    ["2026-09-07", "Hospedaje Demo", "FAC-6201", "MXN", -500, 0, -500],
+    ["2026-09-01", "Papelería Central", "FAC-1001", "CRC", 1000, 160, 1160],
+    ["02/09/2026", "Servicios del Norte", "FAC-2048", "CRC", 2500, 400, 2900],
+    ["2026-09-03", "Café y Oficina", "FAC-3307", "CRC", 450, 72, 522],
+    ["2026-09-04", "Papelería Central", "FAC-1001", "CRC", 1000, 160, 1160],
+    ["fecha-invalida", "Transporte Ejemplo", "FAC-4110", "CRC", 800, 128, 950],
+    ["2026-09-06", "", "FAC-5112", "CRC", 300, 48, 348],
+    ["2026-09-07", "Hospedaje Demo", "FAC-6201", "CRC", -500, 0, -500],
 ]
 
 valid_rows = [
-    ["2026-09-01", "Papelería Central", "FAC-1001", "MXN", 1000, 160, 1160],
-    ["02/09/2026", "Servicios del Norte", "FAC-2048", "MXN", 2500, 400, 2900],
-    ["2026-09-03", "Café y Oficina", "FAC-3307", "MXN", 450, 72, 522],
+    ["2026-09-01", "Papelería Central", "FAC-1001", "CRC", 1000, 160, 1160],
+    ["02/09/2026", "Servicios del Norte", "FAC-2048", "CRC", 2500, 400, 2900],
+    ["2026-09-03", "Café y Oficina", "FAC-3307", "CRC", 450, 72, 522],
 ]
 
 
@@ -52,8 +50,5 @@ def write_workbook(filename, rows):
     print(f"Archivo creado: {filename}")
 
 
-if Path("ejemplo_gastos.xlsx").exists():
-    print("Se conserva el archivo existente: ejemplo_gastos.xlsx")
-else:
-    write_workbook("ejemplo_gastos.xlsx", rows_with_errors)
+write_workbook("ejemplo_gastos.xlsx", rows_with_errors)
 write_workbook("ejemplo_gastos_validos.xlsx", valid_rows)

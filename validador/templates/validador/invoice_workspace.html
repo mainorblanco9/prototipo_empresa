@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f7fb">
+    {% include 'validador/_pwa_head.html' %}
+    <title>Preparar facturas | AnalizadorPro</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous">
+    <style>
+      :root { --ink: #10233f; --muted: #64748b; --line: #dfe7f1; --brand: #2359d1; --teal: #00a88f; --canvas: #f2f6fb; }
+      body { min-height: 100vh; background: radial-gradient(ellipse at 85% 0, #e5edff 0, transparent 32rem), var(--canvas); color: var(--ink); }
+      .page-shell { max-width: 1180px; }
+      .app-layout { display: grid; grid-template-columns: 238px minmax(0, 1fr); gap: 1.35rem; align-items: start; }
+      .app-sidebar { position: sticky; top: 5.5rem; padding: 1rem; border: 1px solid var(--line); border-radius: 1rem; background: rgba(255,255,255,.9); box-shadow: 0 12px 30px rgba(23,47,82,.06); animation: sidebar-in .5s ease-out both; }
+      .sidebar-label { margin: .4rem .65rem .65rem; color: var(--muted); font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+      .side-link { display: flex; align-items: center; gap: .7rem; margin: .25rem 0; padding: .7rem .75rem; border: 1px solid transparent; border-radius: .75rem; color: #405572; font-size: .9rem; font-weight: 650; text-decoration: none; transition: transform .18s ease, background .18s ease, border-color .18s ease, color .18s ease; }
+      .side-link:hover { transform: translateX(3px); border-color: #dce7f6; background: #f4f8ff; color: var(--brand); }
+      .side-link.active { border-color: #d9e5fb; background: linear-gradient(110deg,#eaf1ff,#f5f9ff); color: var(--brand); }
+      .side-link.disabled { color: #93a0b3; cursor: not-allowed; }
+      .side-icon { display: grid; width: 1.8rem; height: 1.8rem; flex: 0 0 auto; place-items: center; border-radius: .58rem; background: #edf3fc; color: var(--brand); font-size: .74rem; font-weight: 850; }
+      .side-link.active .side-icon { background: var(--brand); color: #fff; }
+      .sidebar-note { margin-top: 1rem; padding: .8rem; border: 1px solid #e4ebf5; border-radius: .75rem; background: #f8faff; color: var(--muted); font-size: .75rem; line-height: 1.5; }
+      .app-main { min-width: 0; }
+      .surface-card { border: 1px solid rgba(218, 228, 241, .9); border-radius: 1.1rem; background: rgba(255,255,255,.96); box-shadow: 0 14px 36px rgba(23, 47, 82, .07); }
+      .eyebrow { color: var(--brand); font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+      .app-navbar { background: rgba(255,255,255,.92); border-bottom: 1px solid var(--line); backdrop-filter: blur(14px); }
+      .brand-mark { display: inline-grid; width: 2.25rem; height: 2.25rem; place-items: center; border-radius: .7rem; background: linear-gradient(145deg, #eaf0ff, #d7e4ff); color: var(--brand); font-weight: 800; }
+      .hero-panel { position: relative; overflow: hidden; border-radius: 1.35rem; padding: clamp(1.5rem, 4vw, 2.6rem); color: #fff; background: linear-gradient(120deg, #10233f 0%, #173a70 62%, #2458a3 100%); box-shadow: 0 20px 45px rgba(19, 49, 91, .18); }
+      .hero-panel:after { position: absolute; top: -6rem; right: -2rem; width: 18rem; height: 18rem; border: 1px solid rgba(255,255,255,.13); border-radius: 50%; box-shadow: 0 0 0 2.5rem rgba(255,255,255,.035), 0 0 0 5rem rgba(255,255,255,.025); content: ""; pointer-events: none; }
+      .hero-panel .eyebrow { color: #9bc4ff; }
+      .hero-panel p { color: #d4e1f4; }
+      .workflow-steps { display: flex; flex-wrap: wrap; gap: .55rem; }
+      .workflow-step { display: inline-flex; align-items: center; gap: .5rem; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: .45rem .75rem; color: #c9d7e9; font-size: .82rem; }
+      .workflow-step.active { border-color: rgba(122, 182, 255, .55); background: rgba(122, 182, 255, .14); color: #fff; }
+      .workflow-step.completed { border-color: rgba(0, 209, 164, .4); background: rgba(0, 168, 143, .16); color: #d4fff4; }
+      .step-number { display: grid; width: 1.35rem; height: 1.35rem; place-items: center; border-radius: 50%; background: rgba(255,255,255,.14); font-size: .72rem; font-weight: 800; }
+      .surface-card h2,.surface-card h3 { color: var(--ink); }
+      .metric { height: 100%; border: 1px solid var(--line); border-radius: .9rem; padding: 1rem; background: linear-gradient(145deg,#fff,#f8faff); }
+      .metric strong { display: block; margin-top: .2rem; font-size: 1.5rem; letter-spacing: -.04em; }
+      .metric-accent { color: var(--teal); }
+      .chart-panel { border: 1px solid var(--line); border-radius: .9rem; padding: 1rem; background: #fbfdff; }
+      .chart-bar-row { display: grid; grid-template-columns: minmax(110px,1fr) minmax(90px,2fr) auto; gap: .7rem; align-items: center; margin: .9rem 0; }
+      .chart-track { height: .8rem; overflow: hidden; border-radius: 99px; background: #e7edf5; }
+      .chart-fill { height: 100%; min-width: 3px; border-radius: inherit; background: linear-gradient(90deg,#315fd0,#00a88f); }
+      .chart-empty { border: 1px dashed #cbd6e5; border-radius: .8rem; padding: 1.25rem; color: var(--muted); text-align: center; }
+      .section-divider { border: 0; border-top: 1px solid var(--line); opacity: 1; }
+      .form-control,.form-select { border-color: #d7e1ed; border-radius: .7rem; }
+      .btn-primary { border-color: var(--brand); background: linear-gradient(115deg,#2359d1,#3675e5); box-shadow: 0 7px 16px rgba(35,89,209,.16); }
+      .btn-primary:hover { border-color: #1b48b0; background: #1b48b0; }
+      .table { --bs-table-striped-bg: #f6f9fd; }
+      pre { max-height: 36rem; overflow: auto; padding: 1rem; border-radius: .75rem; background: #102039; color: #e5eaf2; font-size: .85rem; }
+      .mapping-table { max-width: 34rem; }
+      .invoice-table { min-width: 900px; }
+      .invoice-table th,
+      .invoice-table td { white-space: nowrap; }
+      .invoice-table td.supplier-cell { min-width: 12rem; }
+      .app-main > header,.app-main > .row,.app-main > section,.app-main > .alert { animation: content-in .48s ease-out both; }
+      .app-main > .row { animation-delay: .07s; }
+      .surface-card { transition: transform .2s ease, box-shadow .2s ease; }
+      .surface-card:hover { box-shadow: 0 17px 40px rgba(23,47,82,.09); }
+      @keyframes content-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes sidebar-in { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+      @media (max-width: 991.98px) {
+        .app-layout { grid-template-columns: minmax(0,1fr); gap: .9rem; }
+        .app-sidebar { position: static; display: flex; align-items: center; gap: .4rem; overflow-x: auto; padding: .55rem; white-space: nowrap; }
+        .sidebar-label,.sidebar-note { display: none; }
+        .side-link { flex: 0 0 auto; margin: 0; }
+      }
+      @media (max-width: 575.98px) {
+        .side-link { padding: .55rem; font-size: .8rem; }
+        .side-icon { width: 1.6rem; height: 1.6rem; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,*::before,*::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar app-navbar">
+      <div class="container page-shell d-flex justify-content-between align-items-center">
+        <a class="navbar-brand d-flex align-items-center gap-2 fw-semibold mb-0" href="{% url 'index' %}">
+          <span class="brand-mark">V</span><span>Analizador<span class="text-primary">Pro</span></span>
+        </a>
+        <div class="d-flex align-items-center gap-3">
+          <span class="small text-secondary">{{ request.user.username }}</span>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'index' %}">Volver al analizador</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container page-shell app-layout py-4 py-lg-5">
+      <aside class="app-sidebar" aria-label="Navegación del flujo de facturas">
+        <p class="sidebar-label">Flujo de trabajo</p>
+        <a class="side-link active" href="{% url 'invoice_workspace' %}" aria-current="page">
+          <span class="side-icon">01</span><span>Analizar y validar</span>
+        </a>
+        {% if model_ready %}
+          <a class="side-link" href="{% url 'invoice_model_workspace' %}">
+            <span class="side-icon">02</span><span>Preparar modelo</span>
+          </a>
+        {% else %}
+          <span class="side-link disabled" aria-disabled="true" title="Primero analiza y valida correctamente un lote">
+            <span class="side-icon">02</span><span>Preparar modelo</span>
+          </span>
+        {% endif %}
+        <a class="side-link" href="{% url 'issued_invoice_draft' %}">
+          <span class="side-icon">+</span><span>Borrador emitido</span>
+        </a>
+        <a class="side-link" href="{% url 'invoice_audit' %}">
+          <span class="side-icon">≡</span><span>Bitácora</span>
+        </a>
+        <a class="side-link" href="{% url 'index' %}">
+          <span class="side-icon">↗</span><span>Analizador general</span>
+        </a>
+        <div class="sidebar-note">
+          <strong>Entorno de demostración</strong><br>
+          Los controles son locales y no representan una certificación fiscal.
+        </div>
+      </aside>
+      <main class="app-main py-1">
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags|default:'info' }}" role="status">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+      <header class="mb-4">
+        <div class="hero-panel">
+          <p class="eyebrow mb-2">Centro de control · Facturación local</p>
+          <h1 class="display-6 fw-bold mb-2">Análisis y validación de facturas</h1>
+          <p class="mb-4">Selecciona un período, revisa el comportamiento de tus facturas y prepara el modelo local cuando todas pasen las reglas de control.</p>
+          <div class="workflow-steps" aria-label="Flujo de trabajo">
+            <span class="workflow-step {% if batch %}completed{% else %}active{% endif %}"><span class="step-number">1</span> Analizar y graficar</span>
+            <span class="workflow-step {% if batch %}active{% endif %}"><span class="step-number">2</span> Validar</span>
+            <span class="workflow-step"><span class="step-number">3</span> Preparar modelo TRIBU-CR</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="row g-4">
+        <div class="col-12 col-lg-5">
+          <section class="surface-card p-3 p-md-4">
+            <h2 class="h5 fw-bold">Cargar documento</h2>
+            <p class="small text-secondary">Admite una factura por fila en XLSX, CSV o TSV. Este flujo local acepta únicamente colones costarricenses (CRC).</p>
+            <form method="post" enctype="multipart/form-data">
+              {% csrf_token %}
+              <label for="archivo" class="form-label fw-semibold">Archivo de facturas</label>
+              <input id="archivo" name="archivo" class="form-control mb-2" type="file" accept=".xlsx,.csv,.tsv" required>
+              <div class="form-text mb-3">Máximo {{ max_upload_mb }} MB.</div>
+              <button class="btn btn-primary w-100" type="submit" name="action" value="parse">Analizar facturas y validar lote</button>
+            </form>
+            <a class="btn btn-sm btn-outline-primary mt-3" href="{% url 'download_sample_invoices' %}">Descargar facturas ficticias de octubre (CSV)</a>
+            <div class="alert alert-info small mt-3 mb-0">
+              Archivo de prueba: 3 facturas inventadas, moneda CRC, octubre de 2026. Los controles aplicados son reglas locales del prototipo, no certifican cumplimiento fiscal oficial. Con encabezados reconocidos, no se envían datos a Ollama.
+            </div>
+            {% if error %}
+              <div class="alert {% if invoice_type_mismatch %}alert-warning{% else %}alert-danger{% endif %} mt-3 mb-0" role="alert">
+                {{ error }}
+                {% if invoice_type_mismatch %}
+                  <div class="mt-2"><a href="{% url 'index' %}">Ir al Analizador de datos para generar gráficos</a></div>
+                {% endif %}
+              </div>
+            {% endif %}
+          </section>
+
+          <section class="surface-card p-3 p-md-4 mt-4">
+            <h2 class="h6 fw-bold">Controles locales del prototipo</h2>
+            <ul class="small text-secondary mb-0">
+              <li>Fecha, proveedor, número de factura y moneda CRC; otras monedas requieren revisión.</li>
+              <li>Importes con separadores locales comunes, sin negativos y total igual a subtotal más impuesto.</li>
+              <li>Facturas duplicadas para el mismo proveedor.</li>
+            </ul>
+          </section>
+        </div>
+
+        <div class="col-12 col-lg-7">
+          {% if batch %}
+            <section class="surface-card p-3 p-md-4">
+              <p class="eyebrow mb-1">Resultado local</p>
+              <h2 class="h4 fw-bold mb-3">
+                {% if batch.status == "ready" %}Modelo de factura listo para revisión{% else %}El modelo requiere revisión{% endif %}
+              </h2>
+              <div class="row g-3 mb-3">
+                <div class="col-4"><div class="metric"><div class="small text-secondary">Facturas</div><strong>{{ batch.summary.invoice_count }}</strong></div></div>
+                <div class="col-4"><div class="metric"><div class="small text-secondary">Válidas</div><strong class="metric-accent">{{ batch.summary.validated_count }}</strong></div></div>
+                <div class="col-4"><div class="metric"><div class="small text-secondary">Requieren revisión</div><strong>{{ batch.summary.needs_review_count }}</strong></div></div>
+              </div>
+              <section class="chart-panel mb-4" aria-labelledby="monthly-chart-title">
+                <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+                  <div>
+                    <p class="eyebrow mb-1">Análisis del período</p>
+                    <h3 id="monthly-chart-title" class="h5 fw-bold mb-0">Importe por factura y mes</h3>
+                  </div>
+                  <div class="d-flex flex-wrap gap-2">
+                    <div>
+                      <label class="form-label small fw-semibold mb-1" for="invoice-month">Mes</label>
+                      <select class="form-select form-select-sm" id="invoice-month" {% if not invoice_month_options %}disabled{% endif %}>
+                        {% for option in invoice_month_options %}
+                          <option value="{{ option.value }}" {% if option.value == selected_invoice_month %}selected{% endif %}>{{ option.label }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <span class="badge rounded-pill text-bg-light border">Colones · CRC</span>
+                  </div>
+                </div>
+                <div class="row g-2 mb-3">
+                  <div class="col-4"><div class="metric"><div class="small text-secondary">En el período</div><strong id="month-invoice-count">—</strong></div></div>
+                  <div class="col-4"><div class="metric"><div class="small text-secondary">Válidas</div><strong id="month-valid-count" class="metric-accent">—</strong></div></div>
+                  <div class="col-4"><div class="metric"><div class="small text-secondary">Total válido (CRC)</div><strong id="month-valid-total" class="fs-5">—</strong></div></div>
+                </div>
+                <div id="monthly-chart-bars" aria-live="polite"></div>
+                <p class="small text-secondary mb-0">Importes en colones costarricenses. El cálculo y el gráfico se realizan localmente; solo incluyen facturas CRC validadas.</p>
+              </section>
+              <p class="small text-secondary">
+                Tabla detectada: <strong>{{ batch.source_sheet }}</strong>, encabezados en la fila <strong>{{ batch.header_row }}</strong>.
+                Mapeo de columnas: <strong>{{ batch.mapping_source }}</strong>.
+                Integración: <strong>{{ batch.integration.status }}</strong>.
+              </p>
+              {% if batch.column_mapping %}
+                <h3 class="h6 fw-bold">Correspondencia detectada</h3>
+                <div class="table-responsive mapping-table mb-3">
+                  <table class="table table-sm table-bordered align-middle">
+                    <thead class="table-light">
+                      <tr><th scope="col">Campo del modelo</th><th scope="col">Columna detectada</th></tr>
+                    </thead>
+                    <tbody>
+                      {% for field, header in batch.column_mapping.items %}
+                        <tr><th scope="row">{{ field }}</th><td>{{ header }}</td></tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% endif %}
+              {% if batch.status == "ready" %}
+                <a class="btn btn-primary mb-3" href="{% url 'invoice_model_workspace' %}">
+                  Continuar: preparar modelo local para TRIBU-CR
+                </a>
+              {% else %}
+                <div class="alert alert-warning mb-3" role="status">
+                  El lote tiene facturas que requieren revisión. Corrígelas antes de continuar al preparador del modelo.
+                </div>
+              {% endif %}
+
+              <h3 class="h6 fw-bold">Modelo de facturas interpretado</h3>
+              <p class="small text-secondary">Desliza horizontalmente para consultar todas las columnas.</p>
+              <div class="table-responsive mb-3">
+                <table class="table table-sm table-striped table-bordered align-middle invoice-table">
+                  <thead class="table-light">
+                    <tr>
+                      <th scope="col">Fila</th><th scope="col">Factura</th><th scope="col">Proveedor</th><th scope="col">Fecha</th>
+                      <th scope="col">Moneda</th><th scope="col">Subtotal</th><th scope="col">Impuesto</th><th scope="col">Total</th><th scope="col">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for invoice in batch.invoices|slice:":100" %}
+                      <tr>
+                        <td>{{ invoice.row_number }}</td>
+                        <td>{{ invoice.invoice_number|default:"—" }}</td>
+                        <td class="supplier-cell">{{ invoice.supplier|default:"—" }}</td>
+                        <td>{{ invoice.issue_date|default:"—" }}</td>
+                        <td>{{ invoice.currency|default:"—" }}</td>
+                        <td>{{ invoice.subtotal|default:"—" }}</td>
+                        <td>{{ invoice.tax|default:"—" }}</td>
+                        <td>{{ invoice.total|default:"—" }}</td>
+                        <td>
+                          {% if invoice.status == "validated" %}Válida{% else %}Revisar{% endif %}
+                          {% if invoice.errors %}
+                            <div class="small text-danger">{{ invoice.errors|join:"; " }}</div>
+                          {% endif %}
+                        </td>
+                      </tr>
+                    {% empty %}
+                      <tr><td colspan="9" class="text-secondary">No se encontraron filas de facturas en la tabla.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              {% if batch.summary.invoice_count > 100 %}
+                <p class="small text-secondary">Se muestran las primeras 100 filas. El modelo JSON contiene las {{ batch.summary.invoice_count }} facturas detectadas.</p>
+              {% endif %}
+              <details class="mb-3">
+                <summary class="fw-semibold">Ver modelo JSON completo (schema {{ batch.schema_version }})</summary>
+                <pre class="mt-2"><code>{{ batch_json }}</code></pre>
+              </details>
+              <p class="small text-secondary mb-0">
+                Esta salida es una estructura interna para revisión; no se ha enviado a Hacienda y no sustituye el formato oficial requerido por TRIBU-CR.
+              </p>
+            </section>
+          {% else %}
+            <section class="surface-card p-4 p-md-5 h-100 d-flex flex-column justify-content-center">
+              <p class="eyebrow mb-2">Proceso local</p>
+              <h2 class="h3 fw-bold mb-3">Analiza. Valida. Prepara.</h2>
+              <p class="text-secondary">
+                Consulta importes y estados por mes y moneda. Si todas las facturas pasan los controles locales del prototipo, continúa al preparador del modelo; los lotes con observaciones quedan bloqueados hasta corregirlos.
+              </p>
+              <div class="alert alert-warning mb-0">
+                El modelo y la simulación son locales. Esta validación no certifica cumplimiento fiscal ni transmite documentos a TRIBU-CR/Hacienda.
+              </div>
+            </section>
+          {% endif %}
+        </div>
+      </div>
+      </main>
+    </div>
+    {% if batch %}
+      {{ invoice_chart_data|json_script:"invoice-chart-data" }}
+      <script>
+        (() => {
+          const invoices = JSON.parse(document.getElementById("invoice-chart-data").textContent);
+          const monthSelect = document.getElementById("invoice-month");
+          const bars = document.getElementById("monthly-chart-bars");
+          const money = amount => {
+            try {
+              return new Intl.NumberFormat("es-CR", {
+                style: "currency",
+                currency: "CRC",
+                maximumFractionDigits: 2
+              }).format(amount);
+            } catch {
+              return `₡${amount.toLocaleString("es-CR", { maximumFractionDigits: 2 })}`;
+            }
+          };
+          const updateChart = () => {
+            const month = monthSelect.value;
+            const monthInvoices = invoices.filter(invoice => invoice.month === month);
+            const validInvoices = monthInvoices.filter(invoice =>
+              invoice.status === "validated" && invoice.currency === "CRC"
+            );
+            const amounts = validInvoices.map(invoice => Number(invoice.total)).filter(Number.isFinite);
+            const total = amounts.reduce((sum, amount) => sum + amount, 0);
+            document.getElementById("month-invoice-count").textContent = monthInvoices.length;
+            document.getElementById("month-valid-count").textContent = validInvoices.length;
+            document.getElementById("month-valid-total").textContent = money(total);
+            bars.replaceChildren();
+            if (!validInvoices.length) {
+              const empty = document.createElement("p");
+              empty.className = "chart-empty mb-0";
+              empty.textContent = monthInvoices.length
+                ? "No hay facturas válidas con importe para graficar en este período."
+                : "No se encontraron facturas para el mes seleccionado.";
+              bars.append(empty);
+              return;
+            }
+            const maximum = Math.max(...amounts, 1);
+            validInvoices.forEach(invoice => {
+              const amount = Number(invoice.total);
+              if (!Number.isFinite(amount)) return;
+              const row = document.createElement("div");
+              row.className = "chart-bar-row";
+              const label = document.createElement("div");
+              label.className = "small";
+              const number = document.createElement("strong");
+              number.className = "d-block";
+              number.textContent = invoice.invoice_number || "Sin número";
+              const supplier = document.createElement("span");
+              supplier.className = "text-secondary";
+              supplier.textContent = invoice.supplier || "Proveedor sin nombre";
+              label.append(number, supplier);
+              const track = document.createElement("div");
+              track.className = "chart-track";
+              track.setAttribute("role", "img");
+              track.setAttribute("aria-label", `${invoice.invoice_number}: ${money(amount)}`);
+              const fill = document.createElement("div");
+              fill.className = "chart-fill";
+              fill.style.width = `${Math.max(3, amount / maximum * 100)}%`;
+              track.append(fill);
+              const value = document.createElement("strong");
+              value.className = "small text-end";
+              value.textContent = money(amount);
+              row.append(label, track, value);
+              bars.append(row);
+            });
+          };
+          monthSelect.addEventListener("change", updateChart);
+          updateChart();
+        })();
+      </script>
+    {% endif %}
+  </body>
+</html>

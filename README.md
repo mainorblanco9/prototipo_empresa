@@ -1,6 +1,6 @@
-# Prototipo empresarial: validación de gastos
+# Prototipo empresarial: análisis de tablas y gastos
 
-Aplicación inicial en Django para cargar CSV/XLSX, validar datos de gastos y descargar un reporte. La explicación opcional de OpenAI recibe únicamente conteos y categorías de errores; no se envían filas, nombres de proveedores ni montos al modelo.
+Aplicación inicial en Django para analizar tablas CSV/TSV/XLSX con encabezados dinámicos, mostrar una vista previa, recomendar y generar un gráfico, y descargar un reporte. Conserva reglas adicionales para planillas de gastos y la carga condicional a SharePoint.
 
 ## Requisitos
 
@@ -29,10 +29,14 @@ ollama run qwen2.5:3b
 ```
 
 Deja Ollama ejecutándose y levanta Django en la terminal del proyecto. La app se
-conecta al servicio local en `http://localhost:11434`; no necesita una API key y
-las solicitudes del asesor de diseño y del resumen de validación se procesan en
-tu equipo. La descarga del modelo requiere Internet y espacio en disco. El
-rendimiento depende de la memoria y el procesador disponibles.
+conecta al servicio local en `http://localhost:11434`; no necesita una API key.
+El análisis general de tablas y la recomendación de gráficos envían a Ollama
+solo los encabezados y los tipos/conteos inferidos; los valores se procesan
+localmente. La pantalla de facturas tiene su propio flujo de autodetección y,
+solo cuando necesita interpretar encabezados desconocidos, envía a Ollama local
+una muestra pequeña de valores (detallada más abajo). La descarga del modelo
+requiere Internet y espacio en disco. El rendimiento depende de la memoria y
+el procesador disponibles.
 
 Abre <http://127.0.0.1:8000/> e inicia sesión con el usuario mock `demo` y la contraseña `Demo123!`. La cuenta mock solo se habilita con `DJANGO_DEBUG=true` (valor local predeterminado) y no debe usarse en producción. Puedes cambiar el usuario y la contraseña de desarrollo con `DEMO_USERNAME` y `DEMO_PASSWORD`.
 
@@ -46,20 +50,208 @@ En Git Bash, activa el entorno con:
 source .venv/Scripts/activate
 ```
 
-## Alcance actual
+## Análisis de tablas
 
-- Archivos `.csv` UTF-8 y `.xlsx`, máximo 10 MB y 20.000 filas.
-- Revisa fecha, proveedor, factura duplicada por proveedor, moneda, importes no negativos y suma subtotal + impuesto.
-- Permite descargar un CSV con el resultado; el enlace temporal expira en 10 minutos.
+- Acepta `.csv` UTF-8 con separador detectado automáticamente (coma, punto y coma, tabulador o barra vertical), `.tsv` y `.xlsx`.
+- Detecta la fila de encabezados entre las primeras filas de cada hoja XLSX, ignora títulos combinados y selecciona automáticamente la hoja con la tabla más completa. Elimina ambigüedades en encabezados repetidos e infiere categorías, fechas, texto y números.
+- Ollama recomienda qué columnas comparar. La aplicación calcula los agregados y dibuja un gráfico de barras de forma local; si Ollama no responde, usa una selección de respaldo basada en los tipos detectados y muestra un aviso.
+- Reconoce flujos financieros con meses tanto en columnas como en filas. En archivos XLSX calcula localmente fórmulas aritméticas y sumas simples que no tengan resultados guardados por Excel. Si hay varias hojas anuales, puedes cambiar la hoja y el indicador del gráfico. La vista previa y la descarga corresponden a la hoja seleccionada automáticamente; los controles del gráfico responden al instante en el navegador, sin otra consulta a Ollama. Los meses mantienen su orden y los valores negativos se representan desde la línea de cero.
+- Muestra una vista previa de hasta 200 filas; el análisis permite hasta 20.000 filas y 100 columnas. El reporte CSV conserva todas las filas y el enlace vence en 10 minutos.
+- Prueba el flujo con [ejemplo_ventas.csv](./ejemplo_ventas.csv), que usa punto y coma como separador.
+- En el análisis general y la validación de gastos, los valores de celdas se procesan localmente. Para las facturas con encabezados desconocidos, consulta la nota de privacidad del flujo de autodetección más abajo. El flujo costarricense verifica fecha, proveedor, factura duplicada, moneda CRC, importes no negativos y suma subtotal + impuesto.
+- La pantalla autenticada `/facturas/` y el endpoint `POST /api/invoices/parse/` detectan tablas de facturas en hojas y filas distintas de archivos XLSX/CSV/TSV, sin un tope fijo de columnas o filas en este flujo (el archivo está limitado a 10 MB), y convierten cada fila en un objeto JSON versionado. Si los encabezados no se reconocen, Ollama en `localhost` recibe todos los encabezados y una muestra de hasta 10 filas; la cantidad de filas de muestra se adapta al ancho de la tabla para mantener acotado el prompt, y cada valor se trunca a 100 caracteres. El resto del archivo se procesa en Django local. Este flujo no usa OpenAI ni envía datos fuera del computador; las tablas con encabezados reconocidos no requieren IA. Devuelve HTTP 200 cuando las facturas son válidas, HTTP 422 cuando requieren revisión y HTTP 503 si hace falta mapear encabezados pero Ollama no está disponible. Esta etapa solo prepara y valida datos; no transmite facturas a TribuCR.
+- En desarrollo local puedes ejecutar una simulación técnica local desde `/facturas/modelo/` o `POST /api/invoices/local-simulation/`. Solo se habilita con `DEBUG=true`, requiere sesión autenticada y no llama a Hacienda ni genera acuses o recibos fiscales. `/api/invoices/mock-submit/` se conserva como alias legado.
 - Sube el archivo original a SharePoint por Microsoft Graph solo si hay al menos una fila y todas las filas pasan las validaciones.
+- Las tablas de otros temas no se cargan a SharePoint, pues no pasan por las reglas de validación de gastos.
 - Si hay errores, configuración incompleta o una falla de Microsoft Graph, muestra el resultado y explica que no hubo una carga exitosa.
 - Protege la página de carga y los reportes con una sesión Django; incluye una cuenta mock solo para desarrollo.
 - Guarda por usuario la preferencia de tema de la interfaz; la recomendación IA se limita a temas visuales predefinidos y nunca modifica código.
-- Permite usar Ollama local para recomendaciones y resúmenes, sin enviar estos prompts a un servicio externo.
+- Permite usar Ollama local para recomendaciones de gráficos, sin enviar valores de celdas a un servicio externo.
 - No escribe en un sistema contable ni sustituye revisión financiera/fiscal.
 - SQLite es solo para desarrollo local.
+- La bitácora autenticada `/facturas/bitacora/` persiste indefinidamente en la base local hasta que el usuario la borre. Solo conserva fecha, etapa, resultado, UUID aleatorio de lote y conteos; nunca guarda folios, proveedores, importes, contenido ni el nombre del archivo.
+
+## Preparar objetos de facturas para TribuCR
+
+En la aplicación, inicia sesión y abre **Preparar facturas** (ruta
+`/facturas/`). Sube la plantilla XLSX/CSV/TSV; verás la validación, el mapeo
+detectado (incluyendo la hoja y fila de encabezados) y el objeto JSON resultante.
+La lectura detecta tablas con preámbulos y hojas distintas, procesando cualquier
+número de filas y columnas dentro del límite de carga de 10 MB. Si los encabezados
+no bastan para identificar los campos, Ollama local recibe todos los nombres de
+columnas y una muestra variable de hasta 10 filas; el número de filas de muestra
+se reduce al aumentar las columnas y cada celda se trunca a 100 caracteres. La
+muestra puede incluir proveedor, folio o importes, pero solo se envía al servicio
+Ollama en `localhost`; el resto del archivo se procesa en Django y no se llama a
+OpenAI ni a servicios remotos. Para reducir errores de índices, Ollama devuelve
+los nombres exactos de los encabezados y el servidor los valida; ante una
+respuesta inválida, se solicita una corrección una vez. Si las columnas ya se
+reconocen, no se invoca el modelo.
+
+El endpoint local requiere una sesión autenticada y recibe `multipart/form-data`
+con el campo `archivo`. Reutiliza las validaciones de gastos existentes y devuelve
+un lote con `schema_version`, identificador aleatorio, alcance monetario CRC,
+estado general y los objetos de factura extraídos. Cada objeto normaliza el
+número, proveedor, fecha ISO, moneda e importes decimales;
+los documentos que no pasan validación incluyen sus errores y quedan en
+`needs_review`.
+La página presenta una vista tabular del modelo (hasta 100 filas visibles),
+permite expandir el JSON versionado y acepta separadores numéricos comunes
+internacionales, por ejemplo `1.234,56` y `1,234.56`. En esta etapa se acepta
+únicamente `CRC` (colón costarricense); cualquier otro código, incluidos USD y
+MXN, queda en revisión y no se incluye en el modelo listo ni en la simulación.
+El soporte para dólares queda para una etapa posterior. Incluye análisis
+mensual por factura en colones; el gráfico local solo incluye filas validadas.
+La segunda etapa se habilita únicamente para lotes válidos. Descarga
+[ejemplo_facturas_octubre.csv](./ejemplo_facturas_octubre.csv) para probar tres
+facturas ficticias en CRC. Sus datos y la validación son exclusivamente de
+demostración y no constituyen documentos ni certificación fiscal.
+
+Tras validar el archivo, continúa a **Preparar modelo y ver trazabilidad**
+(`/facturas/modelo/`). Esta segunda página muestra las etapas desde la recepción
+del archivo hasta el modelo interno, grafica conteos de validación e importes
+validados en CRC, y permite descargar el mismo lote como JSON. Ollama local
+puede resumir los gráficos usando únicamente conteos y el total agregado en CRC; los
+gráficos se calculan en Django y siguen disponibles aunque Ollama no responda.
+El lote de trabajo se conserva durante 10 minutos; la bitácora de eventos es
+durable en SQLite y almacena solo metadatos, no los datos de las facturas. La
+etapa de envío queda pendiente hasta contar con el contrato oficial de TRIBU-CR.
+
+### Bitácora local
+
+`/facturas/bitacora/` registra análisis (incluidos los que requieren revisión),
+preparación, descargas, respuestas de Ollama y simulaciones. Cada evento queda
+vinculado a un UUID aleatorio y a la cuenta que lo generó. La bitácora no guarda
+nombre de archivo, encabezados, folios, proveedores, importes ni filas de origen.
+Los registros se conservan indefinidamente en la base local y se pueden borrar
+desde esa pantalla; borrar el historial no elimina el lote temporal activo.
+
+El área de facturas detecta hojas de flujo de caja con meses como columnas y
+avisa cuando se carga por error un archivo financiero que no contiene facturas;
+para graficar ese tipo de libro, usa el Analizador de datos (`/`).
+
+### Simulación local del flujo
+
+En `/facturas/`, analiza el archivo y elige un mes para revisar el gráfico de
+totales por factura. Solo si todas las filas pasan las reglas internas CRC
+se habilita el preparador en `/facturas/modelo/`. Desde esa etapa,
+en desarrollo local, se puede simular el recorrido interno del mismo lote. El lote se
+conserva durante 10 minutos en caché local y en la sesión para permitir recuperar
+la preparación si el servidor de desarrollo se reinicia; la sesión no extiende
+la expiración original. El mock devuelve estados
+`simulation_passed` o `simulation_blocked` y un identificador `LOCAL-SIM-*`.
+`simulation_passed` significa únicamente que el lote pasó los controles internos
+actuales; no significa que Hacienda lo haya recibido, validado o aceptado. No se
+generan claves, consecutivos, acuses ni recibos fiscales. Un lote que requiera
+revisión queda bloqueado y la bitácora actualiza el resultado de la simulación.
+
+Los clientes pueden llamar `POST /api/invoices/local-simulation/` con una sesión
+autenticada, token CSRF y un archivo en el campo `archivo`, igual que el endpoint
+de preparación. La ruta responde 404 cuando `DEBUG` está desactivado. La
+respuesta declara `real_hacienda_contacted: false` y `real_submission: false`.
+La simulación no contiene un cliente HTTP de remisión: ejecuta únicamente los
+controles internos de demostración.
+
+El flujo actual analiza facturas recibidas de proveedores como gastos; no es un
+sistema para emitir comprobantes a nombre del usuario. El esquema es una
+representación interna mínima por fila, no un comprobante electrónico oficial
+costarricense. No incluye todavía emisor/receptor, líneas de detalle, códigos
+CABYS, actividad económica, firma digital ni estructura XML. La interfaz muestra
+un catálogo de trabajo de factura electrónica, tiquete electrónico, notas de
+crédito y débito, factura de compra y de exportación. Solo la primera tiene una
+demo genérica y ninguna está implementada o validada para envío fiscal. Cada
+tipo requiere su propio perfil de datos y reglas cotejados con documentación
+oficial vigente; no se simulan como tipos compatibles por solo cambiarles el
+nombre.
+
+### Borrador local de una factura emitida
+
+La ruta `/facturas/emitidas/factura-electronica/` es un flujo separado para
+capturar localmente datos básicos de emisor, receptor y líneas en CRC. El precio
+unitario se ingresa con IVA incluido; la persona selecciona la tarifa por línea
+(13% predeterminada, 4%, 2%, 1%, 0% o exento) y el sistema extrae
+automáticamente el impuesto incluido: `IVA = total_con_IVA × tarifa / (100 +
+tarifa)`, redondeado a céntimos por línea. El subtotal antes de IVA es el total
+con IVA menos ese impuesto. Así se arma un JSON interno 0.2.0. Las tarifas
+disponibles son una ayuda de cálculo, no una determinación de la tarifa fiscal
+aplicable. No asigna consecutivo, clave numérica, códigos tributarios ni tipos
+de identificación oficiales; sus controles se limitan a campos obligatorios,
+rangos, selección de tarifa y aritmética. El JSON descargable se guarda en caché
+local durante 10 minutos y la bitácora solo almacena metadatos. No es un
+comprobante válido ni un documento listo para emitir. Este borrador sirve para
+probar la captura y el recorrido mientras se confirma el contrato oficial y sus
+esquemas.
+
+La página de emisión y la de análisis de facturas recibidas aparecen como flujos
+independientes. El catálogo de tipos en el preparador es orientativo: la demo
+genérica de factura electrónica no constituye soporte oficial y los restantes
+perfiles siguen pendientes de requisitos vigentes.
+
+Ejemplo para una sesión ya iniciada con su token CSRF:
+
+```bash
+curl -b cookies.txt -H "X-CSRFToken: $CSRF_TOKEN" \
+  -F "archivo=@ejemplo_gastos_validos.xlsx" \
+  http://127.0.0.1:8000/api/invoices/parse/
+```
+
+La respuesta contiene objetos como:
+
+```json
+{
+  "schema_version": "1.1.0",
+  "batch_id": "550e8400-e29b-41d4-a716-446655440000",
+  "currency_scope": "CRC",
+  "status": "ready",
+  "invoices": [
+    {
+      "invoice_number": "FAC-1001",
+      "supplier": "Papelería Central",
+      "issue_date": "2026-09-01",
+      "currency": "CRC",
+      "subtotal": "1000",
+      "tax": "160",
+      "total": "1160",
+      "status": "validated",
+      "errors": []
+    }
+  ],
+  "integration": {
+    "provider": "TribuCR",
+    "status": "awaiting_official_api_contract",
+    "accepted_currency": "CRC"
+  }
+}
+```
+
+Todavía no hay envío externo: no encontré una especificación pública oficial
+de Hacienda para enviar o validar facturas electrónicas mediante API de
+TRIBU-CR. La [página oficial de TRIBU-CR](https://www.hacienda.go.cr/TRIBU-CR.html)
+ofrece información general y la [documentación pública de APIs de Hacienda](https://api.hacienda.go.cr/docs)
+describe consultas, no el envío de facturas. Antes de añadir un cliente hacen
+falta las especificaciones oficiales de autenticación, endpoints, esquemas,
+ambiente de pruebas y tratamiento de reintentos. El Excel actual de gastos
+representa una factura por fila; si TribuCR requiere líneas de detalle,
+emisor/receptor, identificación tributaria, claves de actividad u otros campos,
+se deberá ampliar el mapeo con esos datos, no inferirlos ni inventarlos.
+
+## PWA instalable (móvil)
+
+La app expone `/manifest.webmanifest`, `/sw.js`, `/icon.svg` y `/offline/`. En el
+celular se puede instalar desde el navegador ("Añadir a pantalla de inicio") y
+abre en `/facturas/` en modo standalone. El service worker solo guarda la pantalla
+sin conexión y el ícono; las páginas con datos de facturas nunca se almacenan en
+caché del navegador. Los navegadores solo permiten instalar PWAs bajo HTTPS o en
+`localhost`; para probar desde un celular en la red local hace falta HTTPS (por
+ejemplo con un túnel seguro) y agregar el host a `ALLOWED_HOSTS`.
 
 ## Configurar Microsoft Graph / SharePoint
+
+Esta integración pertenece al Analizador general (`/`), no al flujo local de
+preparación de facturas (`/facturas/`), que no envía archivos a SharePoint ni a
+Hacienda. El Analizador general puede cargar una planilla de gastos a SharePoint
+si se configuraron sus credenciales y todas las filas son válidas; si quieres
+mantener todo local, usa el flujo `/facturas/` y no habilites esas credenciales.
 
 La app usa autenticación de aplicación (client credentials) con Microsoft Entra ID. Registra una aplicación en el tenant de la empresa y configura el acceso de Microsoft Graph necesario para escribir únicamente en el sitio de SharePoint previsto. Para producción, prefiere el permiso de aplicación `Sites.Selected` con una concesión explícita de escritura al sitio objetivo, en lugar de permisos amplios sobre todos los sitios. Un administrador de Microsoft 365 debe aprobar el consentimiento y conceder acceso al sitio.
 
