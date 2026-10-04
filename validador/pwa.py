@@ -7,12 +7,14 @@ from django.views.decorators.http import require_GET
 
 
 ICON_SVG = (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">'
-    '<rect width="512" height="512" rx="112" fill="#2359d1"/>'
-    '<path d="M150 150h212v212H150z" fill="none" stroke="#fff" '
-    'stroke-width="28" stroke-linejoin="round"/>'
-    '<path d="M196 256l44 44 80-88" fill="none" stroke="#00d1a4" '
-    'stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>'
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+    '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
+    '<stop offset="0" stop-color="#0b6bff"/><stop offset="1" stop-color="#00c2a8"/></linearGradient></defs>'
+    '<rect width="64" height="64" rx="17" fill="url(#g)"/>'
+    '<path d="M42.5 20.5A15 15 0 1 0 47 32H36" fill="none" stroke="#fff" '
+    'stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    '<path d="M25 32.5l5.2 5.2 9.3-10.2" fill="none" stroke="#bdfff0" '
+    'stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>'
     "</svg>"
 )
 

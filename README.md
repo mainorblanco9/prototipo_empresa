@@ -357,7 +357,7 @@ Abre la carpeta del proyecto. `Ctrl+Shift+B`/*Run Task*: **Iniciar todo (Django 
 compuesto **Django + Gateway** para depurar ambos. Primera vez: `pip install -r requirements.txt`,
 `python manage.py migrate` y `ollama pull qwen2.5:3b`.
 
-## GuanaBill: tres vías de ingreso (sandbox local)
+## GuanaBill: tres vías de ingreso (entorno local)
 
 | Vía | Dónde |
 |---|---|

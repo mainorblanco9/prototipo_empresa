@@ -22,6 +22,7 @@
       .swatch-minimal { background: linear-gradient(135deg, #f5f7fb 0 65%, #3157d5 65%); }
       .swatch-abstract { background: radial-gradient(circle at 72% 30%, #f0abfc 0 18%, transparent 19%), linear-gradient(125deg, #16152b, #5141a5 58%, #16b8a6); }
       .swatch-corporate { background: linear-gradient(135deg, #e7f4ee 0 50%, #176b52 50% 72%, #d8a14a 72%); }
+      .gb-mark { width:2.4rem; height:2.4rem; }
       .brand-mark { display: inline-grid; width: 2.4rem; height: 2.4rem; place-items: center; border-radius: .7rem; background: #eaf0ff; color: #3157d5; font-weight: 800; }
       .btn-primary { background: #3157d5; border-color: #3157d5; }
     </style>
@@ -30,7 +31,7 @@
   <body class="py-4 py-lg-5">
     <main class="container wizard">
       <a class="text-decoration-none text-dark fw-semibold d-inline-flex align-items-center gap-2 mb-4" href="/">
-        <span class="brand-mark">G</span> GuanaBill
+        {% include "validador/_logo.html" with cls="" %} GuanaBill
       </a>
       <div class="mb-4">
         <p class="text-primary small fw-bold text-uppercase mb-2">Personaliza tu espacio</p>

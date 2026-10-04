@@ -16,7 +16,7 @@ SAMPLES = [
 
 
 class Command(BaseCommand):
-    help = "Crea un proveedor de prueba, una API key y facturas de ejemplo (solo sandbox local)."
+    help = "Crea un proveedor de prueba, una API key y facturas de ejemplo (solo entorno local)."
 
     def add_arguments(self, parser):
         parser.add_argument("--user", default="proveedor_prueba", help="Usuario que recibe los datos")
@@ -30,8 +30,8 @@ class Command(BaseCommand):
         if created:
             user.set_password("Proveedor123!")
             user.save()
-        ApiKey.objects.filter(owner=user, name="Sandbox seed").delete()
-        _, raw = ApiKey.issue(user, "Sandbox seed")
+        ApiKey.objects.filter(owner=user, name="Integración principal").delete()
+        _, raw = ApiKey.issue(user, "Integración principal")
         for client_id, description, price, rate in SAMPLES:
             document = _build_document(
                 {
@@ -56,4 +56,4 @@ class Command(BaseCommand):
                 )
         self.stdout.write(self.style.SUCCESS("Datos de prueba listos."))
         self.stdout.write(f"Usuario: {user.username}")
-        self.stdout.write(f"API key (sandbox): {raw}")
+        self.stdout.write(f"API key: {raw}")

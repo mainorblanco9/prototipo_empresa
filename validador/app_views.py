@@ -221,7 +221,7 @@ def hacienda_flow(request):
 
     mode = getattr(settings, "HACIENDA_MODE", "local")
     endpoints = [
-        ("Modo", "Simulador local (sandbox)" if mode == "local" else mode),
+        ("Modo", "Ambiente local de pruebas" if mode == "local" else mode),
         ("Gateway Node.js", settings.GATEWAY_URL),
         ("Token (IDP)", "/mock/auth/realms/rut-stag/protocol/openid-connect/token"),
         ("Recepción", "POST /mock/recepcion/v1/recepcion"),

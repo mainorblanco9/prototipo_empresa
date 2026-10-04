@@ -596,7 +596,7 @@ class ApiRootView(APIView):
                 "currency": "CRC",
                 "official_tribucr_integration": False,
                 "note": (
-                    "API de facturación GuanaBill. En el sandbox local las facturas se envían al simulador de Hacienda."
+                    "API de facturación GuanaBill. Las facturas se envían a Hacienda (ATV)."
                 ),
             }
         )

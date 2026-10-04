@@ -13,7 +13,7 @@
     .gb-shell { display:grid; grid-template-columns: 220px minmax(0,1fr); min-height:100vh; min-height:100dvh; }
     .gb-side { background:var(--surface); border-right:1px solid var(--line); padding:1.25rem 1rem; position:sticky; top:0; height:100vh; height:100dvh; overflow-y:auto; overscroll-behavior:contain; z-index:60; display:flex; flex-direction:column; gap:.25rem; }
     .gb-logo { display:flex; align-items:center; gap:.5rem; font-weight:800; font-size:1.25rem; color:var(--brand-dark); text-decoration:none; margin-bottom:1.25rem; }
-    .gb-logo .brand-mark { width:2.2rem; height:2.2rem; display:inline-grid; place-items:center; }
+    .gb-logo .gb-mark { width:2.2rem; height:2.2rem; flex:none; }
     .gb-nav a { display:flex; align-items:center; gap:.7rem; padding:.65rem .9rem; border-radius:999px; text-decoration:none; color:var(--ink); font-weight:600; }
     .gb-nav a:hover { background:var(--soft); }
     .gb-nav a.on { background:var(--soft2); color:var(--brand-dark); }
@@ -94,7 +94,7 @@
     @media (min-width:992px) and (max-width:1199px) {
       .gb-shell { grid-template-columns:72px minmax(0,1fr); }
       .gb-side { padding:1rem .5rem; align-items:center; }
-      .gb-logo span:not(.brand-mark), .gb-nav .grp, .gb-side-foot { display:none; }
+      .gb-logo > span, .gb-nav .grp, .gb-side-foot { display:none; }
       .gb-nav a { justify-content:center; padding:.7rem; font-size:1.2rem; }
       .gb-nav a .t { display:none; }
     }
@@ -134,7 +134,7 @@
 {% with name=request.resolver_match.url_name %}
 <div class="gb-shell">
   <aside class="gb-side">
-    <a class="gb-logo" href="{% url 'dashboard' %}"><span class="brand-mark">G</span><span>Guana<span class="text-primary">Bill</span></span></a>
+    <a class="gb-logo" href="{% url 'dashboard' %}">{% include "validador/_logo.html" with cls="" %}<span>Guana<span class="text-primary">Bill</span></span></a>
     <nav class="gb-nav">
       <a href="{% url 'dashboard' %}" class="{% if name == 'dashboard' %}on{% endif %}"><span>🏠</span><span class="t">Panel</span></a>
       <div class="grp">Facturación</div>
@@ -152,8 +152,8 @@
       <a href="{% url 'index' %}" class="{% if name == 'index' %}on{% endif %}"><span>📊</span><span class="t">Análisis de datos</span></a>
     </nav>
     <div class="gb-side-foot mt-auto small text-secondary px-2">
-      <span class="gb-env">{{ gb_environment_label }}</span>
-      <div class="mt-2">Envíos al simulador local de Hacienda.</div>
+      {% if gb_environment_label %}<span class="gb-env">{{ gb_environment_label }}</span>{% endif %}
+      <div class="mt-2">Conectado a Hacienda (ATV).</div>
     </div>
   </aside>
   <main class="gb-main">
@@ -162,7 +162,7 @@
       <button type="button" class="gb-menu-btn" id="gb-menu" aria-label="Abrir menú">☰</button>
       <h1>{% block heading %}{% endblock %}</h1>
       <div class="gb-user">
-        <span class="gb-env d-lg-none">{{ gb_environment_label }}</span>
+        {% if gb_environment_label %}<span class="gb-env d-lg-none">{{ gb_environment_label }}</span>{% endif %}
         <div class="gb-tools">
           <button type="button" class="gb-themebtn" id="gb-themebtn" aria-expanded="false">🎨 Tema</button>
           <div class="gb-pop" id="gb-pop" role="dialog" aria-label="Cambiar tema">

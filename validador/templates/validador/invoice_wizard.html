@@ -56,7 +56,7 @@
       <p>La factura se crea con <code>POST /api/v1/invoices/</code>, la misma API que usan los proveedores.</p>
       <div class="d-grid gap-2">
         <button type="button" class="btn btn-outline-primary" id="save-btn">Crear factura (borrador)</button>
-        <button type="button" class="btn btn-primary" id="send-btn" data-confirm-title="¿Enviar a Hacienda?" data-confirm="Se creará la factura y se enviará al simulador local de Hacienda. Esta acción no se puede deshacer." data-confirm-ok="Crear y enviar" data-confirm-icon="📤">Crear y enviar al sandbox de Hacienda</button>
+        <button type="button" class="btn btn-primary" id="send-btn" data-confirm-title="¿Enviar a Hacienda?" data-confirm="Se creará la factura y se enviará a Hacienda. Esta acción no se puede deshacer." data-confirm-ok="Crear y enviar" data-confirm-icon="📤">Crear y enviar a Hacienda</button>
       </div>
       <div id="result" class="mt-3"></div>
       <button type="button" class="btn btn-link px-0" id="blank-btn">＋ Nueva factura en blanco</button>
@@ -83,7 +83,7 @@
     <li id="c-receiver">○ Receptor con identificación válida</li>
     <li id="c-lines">○ Al menos una línea con precio</li>
   </ul>
-  <div class="small text-secondary mt-2">Al enviar, Hacienda (simulador) recibe clave de 50 dígitos y XML v4.4.</div>
+  <div class="small text-secondary mt-2">Al enviar, Hacienda recibe clave de 50 dígitos y XML v4.4.</div>
 </div></aside></div>{% endblock %}
 {% block scripts %}<script>
 const $ = (id) => document.getElementById(id);
@@ -203,7 +203,7 @@ async function create(send) {
     if (send) {
       created = await api(`/api/v1/invoices/${created.id}/transition/`, { to: "ready", version: created.version });
       await api(`/api/v1/invoices/${created.id}/submit/`, {});
-      msg += " Enviada al sandbox de Hacienda; revisa el resultado en Mis facturas.";
+      msg += " Enviada a Hacienda; revisa el resultado en Mis facturas.";
     }
     $("result").innerHTML = `<div class="alert alert-success">${msg} <a href="{% url 'issued_invoice_list' %}">Ver facturas</a></div>`;
   } catch (e) { $("result").innerHTML = `<div class="alert alert-danger"></div>`; $("result").firstChild.textContent = e.message; }

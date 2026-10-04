@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="es" data-theme="{{ gb_theme }}">
 <head>
   <meta charset="utf-8">
@@ -23,7 +23,7 @@
 
     <section class="relative z-10 hidden lg:flex flex-col justify-between p-12">
       <div class="flex items-center gap-3">
-        <span class="grid h-11 w-11 place-items-center rounded-2xl bg-white text-[#003087] text-xl font-extrabold italic">G</span>
+        {% include "validador/_logo.html" with cls="h-11 w-11" %}
         <span class="text-2xl font-extrabold tracking-tight">Guana<span class="text-sky-400">Bill</span></span>
       </div>
       <div class="max-w-lg">
@@ -35,13 +35,13 @@
           <li class="flex items-center gap-3"><span class="grid h-6 w-6 place-items-center rounded-full bg-sky-400/20 text-sky-300">✓</span> Análisis con IA de cada respuesta</li>
         </ul>
       </div>
-      <p class="text-sm text-white/40">{{ gb_environment_label }} · los envíos van al simulador local de Hacienda</p>
+      <p class="text-sm text-white/40">Facturación electrónica para Costa Rica · Hacienda</p>
     </section>
 
     <main class="relative z-10 flex items-center justify-center p-6 sm:p-10">
       <div class="glass w-full max-w-md rounded-3xl p-8 sm:p-10 shadow-2xl">
         <div class="mb-8 flex items-center gap-3 lg:hidden">
-          <span class="grid h-10 w-10 place-items-center rounded-xl bg-white text-[#003087] font-extrabold italic">G</span>
+          {% include "validador/_logo.html" with cls="h-10 w-10" %}
           <span class="text-xl font-extrabold">Guana<span class="text-sky-400">Bill</span></span>
         </div>
         <span class="inline-flex items-center gap-2 rounded-full bg-amber-300/15 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-300">
@@ -68,7 +68,7 @@
           </div>
           <button type="submit" class="w-full rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-4 py-3.5 font-bold shadow-lg shadow-blue-900/40 transition hover:brightness-110 active:scale-[.99]">Entrar a GuanaBill</button>
         </form>
-        <p class="mt-6 text-center text-xs text-white/40">Sandbox: usuario <span class="font-mono text-white/70">demo</span> · contraseña <span class="font-mono text-white/70">Demo123!</span></p>
+        <p class="mt-6 text-center text-xs text-white/40">Acceso de prueba: usuario <span class="font-mono text-white/70">demo</span> · contraseña <span class="font-mono text-white/70">Demo123!</span></p>
       </div>
     </main>
   </div>

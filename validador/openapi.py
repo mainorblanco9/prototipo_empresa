@@ -150,7 +150,7 @@ def build_spec(server_url="http://127.0.0.1:8001"):
                        {"200": _json({"type": "object"})}, path_id=True, operation_id="receptionPayload"),
         },
         "/api/v1/invoices/{id}/submit/": {
-            "post": _op("Enviar a Hacienda", "Pasa por el gateway Node.js hacia el simulador local y actualiza el estado.", flow,
+            "post": _op("Enviar a Hacienda", "Pasa por el gateway Node.js hacia el ambiente local y actualiza el estado.", flow,
                         {"200": _json(_ref("SubmitResult")), "409": _err("Estado no enviable"), "422": _json(_ref("ValidationResult"), "No pasó la validación local"),
                          "502": _err("El gateway respondió con error"), "503": _err("Gateway no disponible")}, path_id=True, operation_id="submitInvoice"),
         },
@@ -251,7 +251,7 @@ def build_spec(server_url="http://127.0.0.1:8001"):
             "version": "1.0.0",
             "description": (
                 "API de facturación electrónica para Costa Rica. En el entorno local las facturas se validan y se "
-                "envían al **simulador de Hacienda (ATV)**; la firma XAdES y el CABYS real quedan para producción.\n\n"
+                "envían al **ambiente de Hacienda (ATV)**; la firma XAdES y el CABYS real quedan para producción.\n\n"
                 "Flujo: crear → `validate` → `transition` a `ready` → `submit` → consultar estado y análisis de IA."
             ),
         },

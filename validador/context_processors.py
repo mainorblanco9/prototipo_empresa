@@ -6,7 +6,7 @@ from .models import UserDesignPreference
 
 def branding(request):
     mode = getattr(settings, "HACIENDA_MODE", "local")
-    label = "Sandbox local" if mode == "local" else "Producción"
+    label = "" if mode == "local" else "Producción"
     theme = "minimal"
     user = getattr(request, "user", None)
     if user is not None and user.is_authenticated:
