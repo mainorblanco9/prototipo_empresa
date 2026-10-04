@@ -1175,3 +1175,13 @@ def download_report(request, report_id):
     response = HttpResponse(report, content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = 'attachment; filename="reporte_validacion.csv"'
     return response
+
+
+@login_required
+def mobile_capture(request):
+    return render(request, "validador/mobile_capture.html")
+
+
+@login_required
+def issued_invoice_list(request):
+    return render(request, "validador/issued_invoice_list.html")

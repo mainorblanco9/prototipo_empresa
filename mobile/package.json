@@ -1,0 +1,21 @@
+{
+  "name": "analizadorpro-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Envoltorio nativo (Android/iOS) de la PWA de AnalizadorPro con Capacitor",
+  "scripts": {
+    "add:android": "cap add android",
+    "add:ios": "cap add ios",
+    "sync": "cap sync",
+    "open:android": "cap open android",
+    "open:ios": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/ios": "^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0"
+  }
+}

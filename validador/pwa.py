@@ -17,7 +17,8 @@ ICON_SVG = (
 )
 
 SERVICE_WORKER_JS = """
-const CACHE = "analizadorpro-shell-v1";
+const CACHE = "analizadorpro-shell-v2";
+const CAPTURE_URL = "/facturas/movil/";
 const OFFLINE_URL = "/offline/";
 
 self.addEventListener("install", event => {
@@ -37,13 +38,24 @@ self.addEventListener("activate", event => {
   );
 });
 
-// Solo se guarda la pantalla sin conexión y el ícono. Las páginas con datos
-// de facturas nunca se almacenan en caché del navegador.
+// Solo se guardan la pantalla sin conexión, el ícono y el formulario de captura
+// móvil (sin datos de facturas; estas viven en IndexedDB del dispositivo).
+// Las demás páginas con datos nunca se almacenan en caché.
 self.addEventListener("fetch", event => {
   const request = event.request;
   if (request.method !== "GET" || request.mode !== "navigate") return;
+  const isCapture = new URL(request.url).pathname === CAPTURE_URL;
   event.respondWith(
-    fetch(request).catch(() => caches.match(OFFLINE_URL))
+    fetch(request)
+      .then(response => {
+        if (isCapture && response.ok && !response.redirected) {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put(CAPTURE_URL, copy));
+        }
+        return response;
+      })
+      .catch(() => Promise.resolve(isCapture ? caches.match(CAPTURE_URL) : null)
+        .then(cached => cached || caches.match(OFFLINE_URL)))
   );
 });
 """.strip()
@@ -56,14 +68,18 @@ def manifest(request):
         "short_name": "AnalizadorPro",
         "description": (
             "Prototipo local para preparar y dar seguimiento a facturas en "
-            "colones. No transmite documentos a Hacienda."
+            "colones. Envía solo al simulador local de Hacienda."
         ),
         "lang": "es-CR",
-        "start_url": "/facturas/",
+        "start_url": "/facturas/movil/",
         "scope": "/",
         "display": "standalone",
         "background_color": "#f2f6fb",
         "theme_color": "#2359d1",
+        "shortcuts": [
+            {"name": "Capturar factura", "url": "/facturas/movil/"},
+            {"name": "Facturas emitidas", "url": "/facturas/emitidas/"},
+        ],
         "icons": [
             {
                 "src": "/icon.svg",

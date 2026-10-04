@@ -1,3 +1,10 @@
 {
-    "chat.disableAIFeatures": true
+  "chat.disableAIFeatures": true,
+  "python.defaultInterpreterPath": "python",
+  "python.terminal.activateEnvironment": true,
+  "python.testing.unittestEnabled": true,
+  "python.testing.unittestArgs": ["-v", "-s", ".", "-p", "test*.py"],
+  "files.eol": "\n",
+  "files.exclude": { "**/__pycache__": true, "**/node_modules": true },
+  "[javascript]": { "editor.defaultFormatter": "vscode.typescript-language-features" }
 }

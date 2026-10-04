@@ -657,13 +657,14 @@ class ExpenseValidationTests(TestCase):
         self.assertEqual(manifest.status_code, 200)
         data = json.loads(manifest.content)
         self.assertEqual(data["display"], "standalone")
-        self.assertEqual(data["start_url"], "/facturas/")
+        self.assertEqual(data["start_url"], "/facturas/movil/")
 
         worker = self.client.get(reverse("pwa_service_worker"))
         self.assertEqual(worker.status_code, 200)
         self.assertEqual(worker["Service-Worker-Allowed"], "/")
         self.assertIn("no-cache", worker["Cache-Control"])
-        self.assertNotIn(b"/facturas/", worker.content)
+        self.assertNotIn(b"/facturas/emitidas", worker.content)
+        self.assertNotIn(b"/api/", worker.content)
 
         self.assertEqual(self.client.get(reverse("pwa_icon")).status_code, 200)
         self.assertEqual(self.client.get(reverse("pwa_offline")).status_code, 200)

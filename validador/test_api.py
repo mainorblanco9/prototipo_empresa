@@ -246,3 +246,162 @@ class IssuedInvoiceApiTests(TestCase):
             reverse("api_invoice_summary"), {"month": "2026-10"}
         ).json()
         self.assertEqual(october_summary["totals"]["total"], "2260.00")
+
+
+class HaciendaFlowTests(TestCase):
+    def setUp(self):
+        user = get_user_model().objects.create_user("hacienda-user", password="Clave-segura-1")
+        self.client = APIClient()
+        self.client.force_authenticate(user)
+        response = self.client.post(reverse("api_invoice_list"), payload(), format="json")
+        self.invoice = response.json()
+
+    def transition(self, to):
+        invoice = self.client.get(reverse("api_invoice_detail", args=[self.invoice["id"]])).json()
+        return self.client.post(
+            reverse("api_invoice_transition", args=[invoice["id"]]),
+            {"to": to, "version": invoice["version"]},
+            format="json",
+        )
+
+    def queue(self):
+        invoice = self.client.get(reverse("api_invoice_detail", args=[self.invoice["id"]])).json()
+        return self.client.post(
+            reverse("api_invoice_queue", args=[invoice["id"]]),
+            {"version": invoice["version"]},
+            format="json",
+        )
+
+    def test_hacienda_states_cannot_be_set_manually(self):
+        self.transition("ready")
+        self.assertEqual(self.transition("accepted").status_code, 400)
+
+    def test_draft_cannot_be_queued(self):
+        self.assertEqual(self.queue().status_code, 409)
+
+    def test_queue_generates_50_digit_clave_and_payload(self):
+        self.transition("ready")
+        queued = self.queue()
+        self.assertEqual(queued.status_code, 200)
+        data = queued.json()
+        self.assertEqual(data["status"], "queued")
+        self.assertRegex(data["clave"], r"^506\d{47}$")
+        self.assertEqual(data["clave"][3:9], "031026")
+        self.assertEqual(data["clave"][9:21], "003101000000")
+        payload_response = self.client.get(
+            reverse("api_invoice_reception_payload", args=[data["id"]])
+        ).json()
+        self.assertEqual(payload_response["clave"], data["clave"])
+        import base64
+
+        xml = base64.b64decode(payload_response["comprobanteXml"]).decode()
+        self.assertIn("<Clave>" + data["clave"] + "</Clave>", xml)
+        self.assertIn("FacturaElectronica", xml)
+
+    def test_consecutive_increments(self):
+        self.transition("ready")
+        first = self.queue().json()
+        second_draft = self.client.post(
+            reverse("api_invoice_list"), payload(), format="json"
+        ).json()
+        self.client.post(
+            reverse("api_invoice_transition", args=[second_draft["id"]]),
+            {"to": "ready", "version": second_draft["version"]},
+            format="json",
+        )
+        refreshed = self.client.get(
+            reverse("api_invoice_detail", args=[second_draft["id"]])
+        ).json()
+        second = self.client.post(
+            reverse("api_invoice_queue", args=[second_draft["id"]]),
+            {"version": refreshed["version"]},
+            format="json",
+        ).json()
+        self.assertNotEqual(first["clave"], second["clave"])
+        self.assertEqual(first["clave"][21:41][-10:], "0000000001")
+        self.assertEqual(second["clave"][21:41][-10:], "0000000002")
+
+    def test_hacienda_result_updates_status(self):
+        self.transition("ready")
+        data = self.queue().json()
+        url = reverse("api_invoice_hacienda_result", args=[data["id"]])
+        processing = self.client.post(url, {"state": "procesando"}, format="json")
+        self.assertEqual(processing.json()["status"], "processing")
+        accepted = self.client.post(
+            url, {"state": "aceptado", "message": "OK"}, format="json"
+        )
+        self.assertEqual(accepted.json()["status"], "accepted")
+        self.assertEqual(accepted.json()["hacienda_message"], "OK")
+        again = self.client.post(url, {"state": "rechazado"}, format="json")
+        self.assertEqual(again.status_code, 409)
+
+    def test_rejected_can_return_to_draft(self):
+        self.transition("ready")
+        data = self.queue().json()
+        self.client.post(
+            reverse("api_invoice_hacienda_result", args=[data["id"]]),
+            {"state": "rechazado", "message": "Error"},
+            format="json",
+        )
+        self.assertEqual(self.transition("draft").status_code, 200)
+
+    def test_pages_render_for_logged_user(self):
+        from django.test import Client
+
+        web = Client()
+        web.force_login(get_user_model().objects.get(username="hacienda-user"))
+        self.assertEqual(web.get(reverse("mobile_capture")).status_code, 200)
+        self.assertEqual(web.get(reverse("issued_invoice_list")).status_code, 200)
+        self.assertIn("/facturas/movil/", web.get(reverse("pwa_service_worker")).content.decode())
+
+
+class AiAssistTests(HaciendaFlowTests):
+    def test_review_draft_returns_exact_cost_and_ai_advice(self):
+        from unittest import mock
+
+        with mock.patch("validador.ai_assist.generate_local_text", return_value="Sugerencia"):
+            response = self.client.post(
+                reverse("api_ai_review_draft"),
+                {k: v for k, v in payload().items() if k != "client_id"},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["cost"]["total"], "2260.00")
+        self.assertEqual(data["advice"], "Sugerencia")
+
+    def test_review_draft_degrades_without_ollama(self):
+        from unittest import mock
+
+        from .ai_client import AIProviderError
+
+        with mock.patch("validador.ai_assist.generate_local_text", side_effect=AIProviderError("sin ollama")):
+            data = self.client.post(
+                reverse("api_ai_review_draft"),
+                {k: v for k, v in payload().items() if k != "client_id"},
+                format="json",
+            ).json()
+        self.assertFalse(data["ai_available"])
+        self.assertEqual(data["cost"]["total"], "2260.00")
+
+    def test_hacienda_analysis_saved_and_fallback(self):
+        from unittest import mock
+
+        from .ai_client import AIProviderError
+
+        self.transition("ready")
+        data = self.queue().json()
+        url = reverse("api_invoice_ai_analysis", args=[data["id"]])
+        self.client.post(
+            reverse("api_invoice_hacienda_result", args=[data["id"]]),
+            {"state": "rechazado", "message": "Error en receptor"},
+            format="json",
+        )
+        with mock.patch("validador.ai_assist.generate_local_text", side_effect=AIProviderError("x")):
+            result = self.client.post(url).json()
+        self.assertFalse(result["ai_used"])
+        self.assertIn("rechazó", result["analysis"])
+        with mock.patch("validador.ai_assist.generate_local_text", return_value="Causa: receptor"):
+            self.assertTrue(self.client.post(url).json()["ai_used"])
+        detail = self.client.get(reverse("api_invoice_detail", args=[data["id"]])).json()
+        self.assertEqual(detail["ai_analysis"], "Causa: receptor")

@@ -1,10 +1,13 @@
-from decimal import Decimal
+import json
 import secrets
+import urllib.error
+import urllib.request
+from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Sum
+from django.db.models import Count, F, Max, Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers, status as http_status
@@ -20,6 +23,7 @@ from .issued_invoice import (
     TAX_RATES,
     build_issued_invoice_draft,
 )
+from . import ai_assist, hacienda
 from .models import IssuedInvoice, IssuedInvoiceStatusEvent
 
 
@@ -88,9 +92,32 @@ class InvoiceWriteSerializer(serializers.Serializer):
     version = serializers.IntegerField(required=False, min_value=1)
 
 
+MANUAL_STATUSES = [
+    IssuedInvoice.Status.DRAFT,
+    IssuedInvoice.Status.READY,
+    IssuedInvoice.Status.CANCELLED,
+]
+
+
 class TransitionSerializer(serializers.Serializer):
-    to = serializers.ChoiceField(choices=IssuedInvoice.Status.values)
+    to = serializers.ChoiceField(choices=MANUAL_STATUSES)
     version = serializers.IntegerField(min_value=1)
+
+
+class QueueSerializer(serializers.Serializer):
+    version = serializers.IntegerField(min_value=1)
+
+
+HACIENDA_STATE_MAP = {
+    "procesando": IssuedInvoice.Status.PROCESSING,
+    "aceptado": IssuedInvoice.Status.ACCEPTED,
+    "rechazado": IssuedInvoice.Status.REJECTED,
+}
+
+
+class HaciendaResultSerializer(serializers.Serializer):
+    state = serializers.ChoiceField(choices=sorted(HACIENDA_STATE_MAP))
+    message = serializers.CharField(required=False, allow_blank=True, max_length=4000)
 
 
 class InvoiceListSerializer(serializers.ModelSerializer):
@@ -110,6 +137,9 @@ class InvoiceListSerializer(serializers.ModelSerializer):
             "subtotal",
             "tax_total",
             "total",
+            "clave",
+            "hacienda_message",
+            "ai_analysis",
             "version",
             "created_at",
             "updated_at",
@@ -314,6 +344,148 @@ class IssuedInvoiceViewSet(GenericViewSet):
             serializer.validated_data["version"],
         )
 
+    def _record(self, request, invoice, from_status, to_status):
+        IssuedInvoiceStatusEvent.objects.create(
+            invoice=invoice,
+            from_status=from_status,
+            to_status=to_status,
+            actor=request.user,
+        )
+
+    def queue(self, request, pk=None):
+        """Asigna consecutivo y clave y deja la factura lista para el gateway."""
+        invoice = self.get_object()
+        serializer = QueueSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        version = serializer.validated_data["version"]
+        if invoice.status != IssuedInvoice.Status.READY:
+            return _conflict("Solo se puede enviar una factura en estado Listo para envío.")
+        with transaction.atomic():
+            last = (
+                IssuedInvoice.objects.filter(owner=request.user)
+                .aggregate(last=Max("consecutive"))["last"]
+                or 0
+            )
+            try:
+                consecutive = hacienda.build_consecutive(last + 1)
+                clave = hacienda.build_clave(
+                    invoice.issue_date,
+                    invoice.document["issuer"]["identification"],
+                    consecutive,
+                )
+            except hacienda.HaciendaDocumentError as exc:
+                return _bad_request(str(exc))
+            updated = IssuedInvoice.objects.filter(
+                pk=invoice.pk,
+                owner=request.user,
+                version=version,
+                status=IssuedInvoice.Status.READY,
+            ).update(
+                status=IssuedInvoice.Status.QUEUED,
+                consecutive=last + 1,
+                clave=clave,
+                version=version + 1,
+                updated_at=timezone.now(),
+            )
+            if not updated:
+                return _conflict(
+                    "La factura cambió en otro dispositivo. Descarga la versión actual."
+                )
+            self._record(request, invoice, invoice.status, IssuedInvoice.Status.QUEUED)
+        invoice.refresh_from_db()
+        return Response(InvoiceDetailSerializer(invoice).data)
+
+    def reception_payload(self, request, pk=None):
+        invoice = self.get_object()
+        if not invoice.clave:
+            return _conflict("La factura aún no tiene clave; ponla en cola primero.")
+        try:
+            return Response(hacienda.build_reception_payload(invoice))
+        except hacienda.HaciendaDocumentError as exc:
+            return _bad_request(str(exc))
+
+    def hacienda_result(self, request, pk=None):
+        """El gateway informa el ind-estado devuelto por Hacienda."""
+        invoice = self.get_object()
+        serializer = HaciendaResultSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        state = serializer.validated_data["state"]
+        message = serializer.validated_data.get("message", "")
+        target = HACIENDA_STATE_MAP[state]
+        if invoice.status == target:
+            return Response(InvoiceDetailSerializer(invoice).data)
+        if not invoice.can_transition_to(target):
+            return _conflict(
+                f"No se permite pasar de {invoice.get_status_display()} a "
+                f"{IssuedInvoice.Status(target).label}."
+            )
+        with transaction.atomic():
+            updated = IssuedInvoice.objects.filter(
+                pk=invoice.pk,
+                owner=request.user,
+                status=invoice.status,
+            ).update(
+                status=target,
+                hacienda_message=message[:2000],
+                version=F("version") + 1,
+                updated_at=timezone.now(),
+            )
+            if not updated:
+                return _conflict("La factura cambió mientras se procesaba el envío.")
+            self._record(request, invoice, invoice.status, target)
+        invoice.refresh_from_db()
+        return Response(InvoiceDetailSerializer(invoice).data)
+
+    def submit(self, request, pk=None):
+        """Pide al gateway Node.js enviar la factura (flujo de escritorio)."""
+        invoice = self.get_object()
+        if invoice.status not in (
+            IssuedInvoice.Status.READY,
+            IssuedInvoice.Status.QUEUED,
+            IssuedInvoice.Status.PROCESSING,
+        ):
+            return _conflict("Solo se envían facturas Listas para envío.")
+        token, _ = Token.objects.get_or_create(user=request.user)
+        gateway_request = urllib.request.Request(
+            f"{settings.GATEWAY_URL}/invoices/{invoice.pk}/submit",
+            method="POST",
+            headers={"Authorization": f"Token {token.key}"},
+        )
+        try:
+            with urllib.request.urlopen(gateway_request, timeout=30) as response:
+                body = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", "replace")[:300]
+            return Response(
+                {"detail": f"El gateway respondió {exc.code}: {detail}"},
+                status=http_status.HTTP_502_BAD_GATEWAY,
+            )
+        except (urllib.error.URLError, TimeoutError, ValueError):
+            return Response(
+                {"detail": "No se pudo contactar al gateway Node.js. ¿Está en ejecución?"},
+                status=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        invoice.refresh_from_db()
+        return Response(
+            {"gateway": body, "invoice": InvoiceDetailSerializer(invoice).data}
+        )
+
+    def ai_analysis(self, request, pk=None):
+        """An?lisis por IA (Ollama local) de la respuesta de Hacienda."""
+        invoice = self.get_object()
+        if invoice.status not in (
+            IssuedInvoice.Status.ACCEPTED,
+            IssuedInvoice.Status.REJECTED,
+            IssuedInvoice.Status.PROCESSING,
+            IssuedInvoice.Status.QUEUED,
+        ):
+            return _conflict("A?n no hay respuesta de Hacienda que analizar.")
+        text, used_ai = ai_assist.analyze_hacienda_result(invoice)
+        IssuedInvoice.objects.filter(pk=invoice.pk, owner=request.user).update(
+            ai_analysis=text
+        )
+        return Response({"analysis": text, "ai_used": used_ai})
+
     def history(self, request, pk=None):
         invoice = self.get_object()
         return Response(
@@ -361,6 +533,30 @@ class IssuedInvoiceViewSet(GenericViewSet):
                 },
             }
         )
+
+
+class DraftReviewSerializer(serializers.Serializer):
+    issuer_name = serializers.CharField(max_length=250, default="Emisor")
+    issuer_id = serializers.CharField(max_length=100, default="0")
+    receiver_name = serializers.CharField(max_length=250, default="Receptor")
+    receiver_id = serializers.CharField(max_length=100, default="0")
+    issue_date = serializers.DateField()
+    lines = LineSerializer(many=True, allow_empty=False, max_length=MAX_INVOICE_LINES)
+
+
+class DraftReviewView(APIView):
+    """Costo exacto y revisi?n por IA de un borrador sin guardarlo."""
+
+    throttle_scope = "ai"
+
+    def post(self, request):
+        serializer = DraftReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            document = _build_document(serializer.validated_data)
+        except IssuedInvoiceDraftError as exc:
+            return _bad_request(str(exc))
+        return Response(ai_assist.review_draft(document))
 
 
 class ApiRootView(APIView):

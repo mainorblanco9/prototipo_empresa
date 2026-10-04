@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#2359d1">
+    {% include 'validador/_pwa_head.html' %}
+    <title>Facturas emitidas | AnalizadorPro</title>
+    <style>
+      :root { --ink:#10233f; --brand:#2359d1; --line:#dfe7f1; --muted:#64748b; }
+      * { box-sizing: border-box; }
+      body { margin:0; background:#f2f6fb; color:var(--ink); font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+      header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:.5rem; padding:.8rem 1rem; background:var(--brand); color:#fff; }
+      header h1 { margin:0; font-size:1.1rem; }
+      header a { color:#fff; margin-right:1rem; }
+      main { max-width:1000px; margin:0 auto; padding:1rem; }
+      .card { padding:1rem; border:1px solid var(--line); border-radius:1rem; background:#fff; overflow-x:auto; }
+      table { width:100%; border-collapse:collapse; min-width:640px; }
+      th, td { padding:.55rem .5rem; border-bottom:1px solid var(--line); text-align:left; font-size:.92rem; }
+      td.num, th.num { text-align:right; }
+      button { min-height:38px; padding:.35rem .8rem; border:0; border-radius:.6rem; background:var(--brand); color:#fff; font:inherit; font-weight:650; cursor:pointer; }
+      button.secondary { background:#eaf0ff; color:var(--brand); }
+      button:disabled { opacity:.5; cursor:wait; }
+      .badge { padding:.1rem .55rem; border-radius:99px; font-size:.78rem; font-weight:700; background:#eaf0ff; color:var(--brand); white-space:nowrap; }
+      .badge.accepted { background:#dcf7e8; color:#0b6b3a; } .badge.rejected { background:#fdecec; color:#b42318; }
+      .badge.draft { background:#eef1f5; color:#475569; }
+      .msg { margin:.8rem 0; padding:.6rem .8rem; border-radius:.7rem; background:#fff4d6; color:#6b4a00; font-size:.9rem; }
+      .msg:empty { display:none; }
+      .note { color:var(--muted); font-size:.85rem; }
+    </style>
+  </head>
+  <body>
+    {% csrf_token %}
+    <header>
+      <h1>Facturas emitidas</h1>
+      <div><a href="{% url 'mobile_capture' %}">Captura móvil</a><a href="{% url 'invoice_workspace' %}">Inicio</a></div>
+    </header>
+    <main>
+      <p class="note">Flujo: borrador → <strong>Marcar lista</strong> → <strong>Enviar a Hacienda</strong>. El envío usa el gateway Node.js y el simulador local de recepción de Hacienda (no es fiscal).</p>
+      <div class="msg" id="msg" role="status"></div>
+      <div class="card" id="ai" hidden><strong>An?lisis de la respuesta de Hacienda (IA local)</strong><pre id="ai-text" style="white-space:pre-wrap;font:inherit;margin:.5rem 0 0"></pre></div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Fecha</th><th>Receptor</th><th class="num">Total ₡</th><th>Estado</th><th>Clave / mensaje</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <p><button class="secondary" id="reload" type="button">Actualizar</button></p>
+    </main>
+    <script>
+    (() => {
+      const $ = id => document.getElementById(id);
+      const csrf = () => (document.cookie.match(/csrftoken=([^;]+)/) || [])[1]
+        || document.querySelector("[name=csrfmiddlewaretoken]").value;
+      const api = async (path, options = {}) => {
+        const res = await fetch(path, {
+          credentials: "same-origin",
+          ...options,
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrf(), ...(options.headers || {}) },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
+        return data;
+      };
+      const cell = (tr, text, cls) => { const td = tr.insertCell(); td.textContent = text; if (cls) td.className = cls; return td; };
+
+      async function analyze(id) {
+        $("ai").hidden = false; $("ai-text").textContent = "Analizando con IA local?";
+        const data = await api(`/api/v1/invoices/${id}/ai-analysis/`, { method: "POST" });
+        $("ai-text").textContent = (data.ai_used ? "" : "(IA no disponible; an?lisis b?sico)\n") + data.analysis;
+      }
+
+      function row(inv) {
+        const tr = document.createElement("tr");
+        cell(tr, inv.issue_date);
+        cell(tr, inv.receiver_name);
+        cell(tr, Number(inv.total).toLocaleString("es-CR", { minimumFractionDigits: 2 }), "num");
+        const state = cell(tr, "");
+        const badge = document.createElement("span");
+        badge.className = "badge " + inv.status; badge.textContent = inv.status_label;
+        state.appendChild(badge);
+        const info = cell(tr, inv.hacienda_message || inv.clave || "—");
+        info.style.wordBreak = "break-all"; info.style.fontSize = ".78rem";
+        const actions = tr.insertCell();
+        const add = (label, handler, secondary) => {
+          const b = document.createElement("button");
+          b.textContent = label; if (secondary) b.className = "secondary";
+          b.onclick = async () => {
+            b.disabled = true; $("msg").textContent = "";
+            try { await handler(); } catch (e) { $("msg").textContent = e.message; }
+            load();
+          };
+          actions.appendChild(b); actions.append(" ");
+        };
+        if (inv.status === "draft") add("Marcar lista", () => api(`/api/v1/invoices/${inv.id}/transition/`, { method: "POST", body: JSON.stringify({ to: "ready", version: inv.version }) }));
+        if (inv.status === "ready" || inv.status === "queued" || inv.status === "processing")
+          add("Enviar a Hacienda", async () => {
+            await api(`/api/v1/invoices/${inv.id}/submit/`, { method: "POST" });
+            await analyze(inv.id);
+          });
+        if (inv.status === "accepted" || inv.status === "rejected")
+          add("? Analizar respuesta", () => analyze(inv.id), true);
+        if (inv.status === "rejected") add("Volver a borrador", () => api(`/api/v1/invoices/${inv.id}/transition/`, { method: "POST", body: JSON.stringify({ to: "draft", version: inv.version }) }), true);
+        return tr;
+      }
+
+      async function load() {
+        try {
+          const data = await api("/api/v1/invoices/");
+          const rows = $("rows"); rows.replaceChildren(...data.results.map(row));
+          if (!data.results.length) { const tr = rows.insertRow(); const td = tr.insertCell(); td.colSpan = 6; td.textContent = "Aún no hay facturas."; }
+        } catch (e) { $("msg").textContent = e.message; }
+      }
+      $("reload").onclick = load; load();
+    })();
+    </script>
+  </body>
+</html>

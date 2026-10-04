@@ -30,6 +30,32 @@ urlpatterns = [
         api.IssuedInvoiceViewSet.as_view({"get": "history"}),
         name="api_invoice_history",
     ),
+    path(
+        "api/v1/invoices/<uuid:pk>/queue/",
+        api.IssuedInvoiceViewSet.as_view({"post": "queue"}),
+        name="api_invoice_queue",
+    ),
+    path(
+        "api/v1/invoices/<uuid:pk>/reception-payload/",
+        api.IssuedInvoiceViewSet.as_view({"get": "reception_payload"}),
+        name="api_invoice_reception_payload",
+    ),
+    path(
+        "api/v1/invoices/<uuid:pk>/hacienda-result/",
+        api.IssuedInvoiceViewSet.as_view({"post": "hacienda_result"}),
+        name="api_invoice_hacienda_result",
+    ),
+    path(
+        "api/v1/invoices/<uuid:pk>/submit/",
+        api.IssuedInvoiceViewSet.as_view({"post": "submit"}),
+        name="api_invoice_submit",
+    ),
+    path(
+        "api/v1/invoices/<uuid:pk>/ai-analysis/",
+        api.IssuedInvoiceViewSet.as_view({"post": "ai_analysis"}),
+        name="api_invoice_ai_analysis",
+    ),
+    path("api/v1/ai/review-draft/", api.DraftReviewView.as_view(), name="api_ai_review_draft"),
     path("manifest.webmanifest", pwa.manifest, name="pwa_manifest"),
     path("sw.js", pwa.service_worker, name="pwa_service_worker"),
     path("icon.svg", pwa.icon, name="pwa_icon"),
@@ -63,6 +89,8 @@ urlpatterns = [
         views.download_invoice_model,
         name="download_invoice_model",
     ),
+    path("facturas/movil/", views.mobile_capture, name="mobile_capture"),
+    path("facturas/emitidas/", views.issued_invoice_list, name="issued_invoice_list"),
     path("facturas/bitacora/", views.invoice_audit, name="invoice_audit"),
     path("api/invoices/parse/", views.parse_invoice_documents, name="parse_invoice_documents"),
     path(

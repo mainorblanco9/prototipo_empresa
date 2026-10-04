@@ -84,12 +84,27 @@ class IssuedInvoice(models.Model):
         READY = "ready", "Listo para envío"
         CANCELLED = "cancelled", "Anulado localmente"
 
-    # Estados posteriores (en cola, enviado, aceptado, rechazado) se agregan
-    # cuando exista el contrato oficial y la cola de envío.
+        QUEUED = "queued", "Recibido por Hacienda"
+        PROCESSING = "processing", "Procesando en Hacienda"
+        ACCEPTED = "accepted", "Aceptado por Hacienda"
+        REJECTED = "rejected", "Rechazado por Hacienda"
+
+    # QUEUED..REJECTED reflejan ind-estado de la API de recepción (recibido,
+    # procesando, aceptado, rechazado); solo los fija el flujo de envío.
+    HACIENDA_STATES = {
+        Status.QUEUED,
+        Status.PROCESSING,
+        Status.ACCEPTED,
+        Status.REJECTED,
+    }
     ALLOWED_TRANSITIONS = {
         Status.DRAFT: {Status.READY, Status.CANCELLED},
-        Status.READY: {Status.DRAFT, Status.CANCELLED},
+        Status.READY: {Status.DRAFT, Status.CANCELLED, Status.QUEUED},
         Status.CANCELLED: set(),
+        Status.QUEUED: {Status.PROCESSING, Status.ACCEPTED, Status.REJECTED},
+        Status.PROCESSING: {Status.ACCEPTED, Status.REJECTED},
+        Status.ACCEPTED: set(),
+        Status.REJECTED: {Status.DRAFT},
     }
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -114,6 +129,10 @@ class IssuedInvoice(models.Model):
     tax_total = models.DecimalField(max_digits=17, decimal_places=2)
     total = models.DecimalField(max_digits=17, decimal_places=2)
     document = models.JSONField()
+    consecutive = models.PositiveIntegerField(null=True, blank=True)
+    clave = models.CharField(max_length=50, blank=True, db_index=True)
+    hacienda_message = models.TextField(blank=True)
+    ai_analysis = models.TextField(blank=True)
     version = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True, db_index=True)

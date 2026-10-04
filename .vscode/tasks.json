@@ -1,0 +1,68 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Django: migrar",
+      "type": "shell",
+      "command": "python manage.py migrate",
+      "problemMatcher": []
+    },
+    {
+      "label": "Django: servidor",
+      "type": "shell",
+      "command": "python manage.py runserver ${input:bind}",
+      "options": { "env": { "GATEWAY_URL": "http://127.0.0.1:3000" } },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": { "regexp": "^$" },
+        "background": { "activeOnStart": true, "beginsPattern": "Watching for file changes", "endsPattern": "Starting development server" }
+      },
+      "presentation": { "group": "dev", "panel": "dedicated" }
+    },
+    {
+      "label": "Gateway Node: servidor",
+      "type": "shell",
+      "command": "node --watch src/server.js",
+      "options": { "cwd": "${workspaceFolder}/gateway", "env": { "DJANGO_URL": "http://127.0.0.1:8000", "PORT": "3000" } },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "dev", "panel": "dedicated" }
+    },
+    {
+      "label": "Ollama: verificar modelo",
+      "type": "shell",
+      "command": "ollama list",
+      "problemMatcher": []
+    },
+    {
+      "label": "Iniciar todo (Django + Gateway)",
+      "dependsOn": ["Django: servidor", "Gateway Node: servidor"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "Pruebas Django",
+      "type": "shell",
+      "command": "python manage.py test",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Pruebas gateway",
+      "type": "shell",
+      "command": "npm test",
+      "options": { "cwd": "${workspaceFolder}/gateway" },
+      "group": "test",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "bind",
+      "type": "pickString",
+      "description": "Direcci?n de Django (0.0.0.0 para probar desde el tel?fono)",
+      "options": ["127.0.0.1:8000", "0.0.0.0:8000"],
+      "default": "127.0.0.1:8000"
+    }
+  ]
+}

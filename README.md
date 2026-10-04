@@ -315,3 +315,44 @@ La identidad de aplicación permite que la aplicación cargue archivos sin inici
 El inicio de sesión local aún no está conectado al dominio. Para integrar AD, despliega primero en Linux/Docker con conectividad segura al controlador de dominio y configura `django-auth-ldap` sobre LDAPS, grupos y permisos mínimos. No expongas LDAP sin TLS ni guardes credenciales del directorio en el repositorio.
 
 Antes de producción: configura `DJANGO_SECRET_KEY`, desactiva `DJANGO_DEBUG`, integra un proveedor real de identidad (por ejemplo, Active Directory mediante LDAPS), agrega autorización por empresa, límites de carga, política de retención/borrado, auditoría y pruebas con datos ficticios. El login mock se desactiva con `DJANGO_DEBUG=false`. La caché de reportes de esta demo es local y efímera.
+
+## Flujo completo local: celular -> computadora -> Hacienda (simulada)
+
+1. **Celular**: abre `/facturas/movil/` (PWA instalable, también empaquetable como app
+   Android/iOS en `mobile/`). Captura la factura; se guarda en el dispositivo (IndexedDB) y se
+   sincroniza con Django al haber conexión (`client_id` evita duplicados).
+2. **Computadora**: abre `/facturas/emitidas/`, pulsa **Marcar lista** y **Enviar a Hacienda**.
+3. Django asigna consecutivo y **clave numérica de 50 dígitos** (506 + ddmmaa + cédula(12) +
+   consecutivo(20) + situación(1) + código seguridad(8)), genera el XML y llama al **gateway
+   Node.js** (`gateway/`), que usa el contrato de la API de recepción de Hacienda: token OAuth2,
+   `POST /recepcion` (202) y `GET /recepcion/{clave}` (`ind-estado`: recibido, procesando,
+   aceptado, rechazado). Django guarda el estado final (`queued -> processing -> accepted/rejected`).
+
+Arranque: `.\run_local.ps1` (o `-Lan` para usar el teléfono en la misma red con
+`DJANGO_ALLOWED_HOSTS=<IP>`). Pruebas: `python manage.py test` y `cd gateway; npm test`.
+
+### Alcance y límites (importante)
+- Hacienda se **simula** en `gateway/src/mock-hacienda.js` (`/mock/*`); para forzar un rechazo
+  incluye la palabra `RECHAZAR` en la descripción de una línea.
+- El XML sigue la estructura de la v4.4 pero **no está firmado (XAdES-EPES) ni usa CABYS reales**;
+  por eso `HACIENDA_MODE` distinto de `local` está bloqueado. Para producción hacen falta el
+  certificado .p12, firma, validación XSD, CABYS, actividad económica y el IDP real
+  (`api-sandbox.comprobanteselectronicos.go.cr`). Verifica siempre la documentación vigente.
+- Rutas del gateway: `GET /health`, `POST /auth/token`, `GET /invoices`,
+  `POST /invoices/<id>/submit`.
+- Apps nativas: ver `mobile/README.md`.
+## IA local (Ollama) en el flujo
+- **Captura m?vil**: bot?n *Costo y revisi?n con IA* (`POST /api/v1/ai/review-draft/`). El costo
+  (subtotal + IVA = total) lo calcula Django; Ollama sugiere mejoras a descripciones, cantidades y
+  tarifas a confirmar.
+- **Respuesta de Hacienda**: tras *Enviar a Hacienda* se analiza el resultado (aceptada/rechazada)
+  con `POST /api/v1/invoices/<id>/ai-analysis/`; el texto se guarda en `ai_analysis`. Si Ollama no
+  responde, se muestra un an?lisis b?sico sin IA.
+- Solo se usa Ollama en `localhost` (`OLLAMA_MODEL`, por defecto `qwen2.5:3b`). La elecci?n de
+  estilos y la correcci?n de tablas ya existentes siguen en `/diseno/` y `/facturas/`.
+
+## Desarrollo en VS Code
+Abre la carpeta del proyecto. `Ctrl+Shift+B`/*Run Task*: **Iniciar todo (Django + Gateway)**,
+**Pruebas Django**, **Pruebas gateway**, **Ollama: verificar modelo**. En *Run and Debug* usa el
+compuesto **Django + Gateway** para depurar ambos. Primera vez: `pip install -r requirements.txt`,
+`python manage.py migrate` y `ollama pull qwen2.5:3b`.
