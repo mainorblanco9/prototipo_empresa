@@ -464,3 +464,88 @@ class ApiKeyTests(TestCase):
 
         call_command("seed_guanabill", stdout=__import__("io").StringIO())
         self.assertEqual(IssuedInvoice.objects.filter(owner__username="proveedor_prueba").count(), 3)
+
+
+class PeriodAndActivityTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("cierre", password="x-Pass-123")
+        self.client.force_login(self.user)
+
+    def _invoice(self, status, day="2026-01-15", n=1):
+        from .models import IssuedInvoiceStatusEvent
+
+        doc = {"issue_date": day, "receiver": {"name": "Cliente"}, "totals": {"subtotal": "100", "tax": "13", "total": "113"}}
+        inv = IssuedInvoice.objects.create(
+            owner=self.user, client_id=uuid.uuid4(), status=status, issue_date=day,
+            receiver_name="Cliente", subtotal=100, tax_total=13, total=113, document=doc, consecutive=n,
+            clave=f"{n:050d}",
+        )
+        IssuedInvoiceStatusEvent.objects.create(invoice=inv, from_status="", to_status=status, actor=self.user)
+        return inv
+
+    def test_close_blocked_by_draft_and_rejected_then_closed(self):
+        from .models import PeriodClosure
+
+        self._invoice("draft", n=1)
+        rej = self._invoice("rejected", n=2)
+        res = self.client.post(reverse("closures"), {"period": "2026-01", "action": "close"})
+        self.assertContains(res, "No se pudo cerrar")
+        self.assertEqual(PeriodClosure.objects.get().result, "blocked")
+        IssuedInvoice.objects.filter(status="draft").update(status="accepted")
+        rej.status = "accepted"
+        rej.save()
+        res = self.client.post(reverse("closures"), {"period": "2026-01", "action": "close"})
+        self.assertContains(res, "cerrado")
+        self.assertEqual(PeriodClosure.objects.first().result, "closed")
+
+    def test_closed_period_rejects_new_invoices_until_reopened(self):
+        self._invoice("accepted")
+        self.client.post(reverse("closures"), {"period": "2026-01", "action": "close"})
+        payload = {
+            "client_id": str(uuid.uuid4()), "issuer_name": "E", "issuer_id": "1", "receiver_name": "R",
+            "receiver_id": "2", "issue_date": "2026-01-20",
+            "lines": [{"description": "x", "quantity": 1, "unit_price": "113", "tax_rate": "13"}],
+        }
+        self.assertEqual(self.client.post("/api/v1/invoices/", payload, content_type="application/json").status_code, 409)
+        self.client.post(reverse("closures"), {"period": "2026-01", "action": "reopen", "note": "ajuste"})
+        payload["client_id"] = str(uuid.uuid4())
+        self.assertEqual(self.client.post("/api/v1/invoices/", payload, content_type="application/json").status_code, 201)
+
+    def test_activity_log_filters_and_csv(self):
+        self._invoice("accepted", n=1)
+        self._invoice("rejected", n=2)
+        self.client.post(reverse("closures"), {"period": "2026-01", "action": "close"})
+        res = self.client.get(reverse("activity_log"), {"resultado": "rechazados"})
+        self.assertContains(res, "Rechazada por Hacienda")
+        self.assertNotContains(res, "Aceptada por Hacienda")
+        res = self.client.get(reverse("activity_log"), {"tipo": "cierres", "formato": "csv"})
+        self.assertIn("Cierre rechazado", res.content.decode("utf-8-sig"))
+
+    def test_dashboard_and_pages_render_without_demo_wording(self):
+        for name in ("dashboard", "issued_invoice_list", "invoice_wizard", "import_invoices", "closures", "integrations", "activity_log"):
+            body = self.client.get(reverse(name)).content.decode()
+            self.assertNotIn("Demo gen", body)
+            self.assertNotIn("emostraci", body)
+            self.assertNotIn("rototipo", body)
+
+    def test_excel_import_validates_then_creates_idempotently(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        csv_text = (
+            "factura,emisor,cedula_emisor,receptor,cedula_receptor,fecha,descripcion,cantidad,precio_con_iva,iva\n"
+            "F1,Emisor,3101,Cliente,3102,2026-01-10,Servicio,1,113,13\n"
+            "F1,Emisor,3101,Cliente,3102,2026-01-10,Otro,2,50,exempt\n"
+            "F2,Emisor,3101,Cliente,3102,fecha-mala,Servicio,1,113,13\n"
+        )
+        def upload(confirm):
+            f = SimpleUploadedFile("lote.csv", csv_text.encode(), content_type="text/csv")
+            return self.client.post("/api/v1/invoices/import/", {"file": f, **({"confirm": "1"} if confirm else {})}).json()
+        preview = upload(False)
+        self.assertEqual((preview["valid"], preview["with_errors"], preview["created"]), (1, 1, 0))
+        self.assertEqual(IssuedInvoice.objects.count(), 0)
+        self.assertEqual(upload(True)["created"], 1)
+        self.assertEqual(upload(True)["created"], 0)
+        self.assertEqual(IssuedInvoice.objects.count(), 1)
+        self.assertEqual(IssuedInvoice.objects.get().total, 213)
+        self.assertContains(self.client.get(reverse("import_template")), "factura,emisor")
+

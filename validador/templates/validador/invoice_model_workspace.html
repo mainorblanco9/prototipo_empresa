@@ -111,7 +111,7 @@
           <span class="side-icon">↗</span><span>Analizador general</span>
         </a>
         <div class="sidebar-note">
-          <strong>Entorno de demostración</strong><br>
+          <strong>Ambiente de pruebas local</strong><br>
           El modelo es local; el envío oficial requiere el contrato de TRIBU-CR.
         </div>
       </aside>
@@ -120,7 +120,7 @@
         <div class="hero-panel">
           <p class="eyebrow mb-2">Paso 2 · Preparador local TRIBU-CR</p>
           <h1 class="display-6 fw-bold mb-2">Modelo y trazabilidad</h1>
-          <p class="mb-4">Analiza gastos en CRC, consulta la bitácora y ejecuta una prueba técnica local del flujo. Aún no se emiten ni se envían comprobantes electrónicos.</p>
+          <p class="mb-4">Analiza gastos en CRC, consulta la bitácora y ejecuta una prueba técnica local del flujo. </p>
           <div class="workflow-steps" aria-label="Flujo de trabajo">
             <span class="workflow-step completed"><span class="step-number">1</span> Analizar y graficar</span>
             <span class="workflow-step completed"><span class="step-number">2</span> Validar</span>
@@ -130,7 +130,7 @@
       </header>
 
       <div class="alert alert-warning" role="status">
-        <strong>Ambiente local de preparación, no sistema emisor.</strong> Este lote de gastos de proveedores se convierte en un JSON interno de demostración. No es un XML fiscal, no representa una factura electrónica emitida y no se transmite a TRIBU-CR/Hacienda.
+        <strong>Preparación de lote.</strong> Este lote de gastos se convierte en un resumen interno para revisión. Para emitir y enviar facturas usa Facturas, Nueva factura o Importar Excel.
       </div>
 
       <section class="surface-card p-3 p-md-4 mb-4" aria-labelledby="trace-title">
@@ -172,7 +172,7 @@
                 <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                   <h3 class="h6 fw-bold mb-0">{{ profile.name }}</h3>
                   {% if profile.status == "available" %}
-                    <span class="badge text-bg-warning">Demo genérica</span>
+                    <span class="badge text-bg-warning">Disponible</span>
                   {% else %}
                     <span class="badge text-bg-light border text-secondary">Pendiente</span>
                   {% endif %}
@@ -260,7 +260,7 @@
             <div class="alert {% if mock_result.status == 'simulation_passed' %}alert-success{% else %}alert-warning{% endif %} mt-3" role="status">
               <strong>{% if mock_result.status == "simulation_passed" %}Simulación local superada{% else %}Simulación local bloqueada{% endif %}</strong>
               <div>{{ mock_result.message }}</div>
-              <div class="mt-2">{{ mock_result.simulated_ready_count }} registros superaron los controles de demostración · {{ mock_result.blocked_count }} bloqueados.</div>
+              <div class="mt-2">{{ mock_result.simulated_ready_count }} registros superaron los controles internos · {{ mock_result.blocked_count }} bloqueados.</div>
               <div class="small mt-1">Referencia técnica local: <code>{{ mock_result.simulation_id }}</code> · Sin acuse fiscal ni comunicación con Hacienda.</div>
             </div>
             <details>

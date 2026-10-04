@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
 from validador.api import _build_document, _document_fields
-from validador.models import ApiKey, IssuedInvoice
+from validador.models import ApiKey, IssuedInvoice, IssuedInvoiceStatusEvent
 
 SAMPLES = [
     ("seed-001", "Servicio de consultoria", "113000", "13"),
@@ -18,12 +18,15 @@ SAMPLES = [
 class Command(BaseCommand):
     help = "Crea un proveedor de prueba, una API key y facturas de ejemplo (solo sandbox local)."
 
+    def add_arguments(self, parser):
+        parser.add_argument("--user", default="proveedor_prueba", help="Usuario que recibe los datos")
+
     def handle(self, *args, **options):
         if getattr(settings, "HACIENDA_MODE", "local") != "local":
             self.stderr.write("Solo disponible con HACIENDA_MODE=local.")
             return
         User = get_user_model()
-        user, created = User.objects.get_or_create(username="proveedor_prueba")
+        user, created = User.objects.get_or_create(username=options["user"])
         if created:
             user.set_password("Proveedor123!")
             user.save()
@@ -42,11 +45,15 @@ class Command(BaseCommand):
                     ],
                 }
             )
-            IssuedInvoice.objects.get_or_create(
+            invoice, was_created = IssuedInvoice.objects.get_or_create(
                 owner=user,
                 client_id=uuid.uuid5(uuid.NAMESPACE_URL, client_id),
                 defaults=_document_fields(document),
             )
+            if was_created:
+                IssuedInvoiceStatusEvent.objects.create(
+                    invoice=invoice, from_status="", to_status=invoice.status, actor=user
+                )
         self.stdout.write(self.style.SUCCESS("Datos de prueba listos."))
-        self.stdout.write("Usuario: proveedor_prueba / Proveedor123!")
+        self.stdout.write(f"Usuario: {user.username}")
         self.stdout.write(f"API key (sandbox): {raw}")

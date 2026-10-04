@@ -1,6 +1,6 @@
 // Cliente de la API de recepción de Hacienda. Solo se habilita el simulador
 // local: enviar a Hacienda real exige XML firmado con XAdES-EPES y el
-// certificado del contribuyente, algo que este prototipo aún no implementa.
+// certificado del contribuyente, algo que GuanaBill aún no implementa.
 export function createHaciendaClient({
   mode = "local",
   baseUrl,

@@ -173,7 +173,7 @@ class IssuedInvoiceStatusEvent(models.Model):
 
 
 class ApiKey(models.Model):
-    """Credencial para que un proveedor envie facturas desde su sistema."""
+    """Credencial para que un proveedor envíe facturas desde su sistema."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(
@@ -208,3 +208,31 @@ class ApiKey(models.Model):
     @property
     def is_active(self):
         return self.revoked_at is None
+
+
+class PeriodClosure(models.Model):
+    """Bitácora de cierres de periodo (mes): intentos bloqueados, cierres y reaperturas."""
+
+    class Result(models.TextChoices):
+        CLOSED = "closed", "Periodo cerrado"
+        BLOCKED = "blocked", "Cierre rechazado por validación"
+        REOPENED = "reopened", "Periodo reabierto"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="period_closures"
+    )
+    period = models.CharField(max_length=7, db_index=True)
+    result = models.CharField(max_length=16, choices=Result.choices)
+    invoice_count = models.PositiveIntegerField(default=0)
+    accepted_count = models.PositiveIntegerField(default=0)
+    rejected_count = models.PositiveIntegerField(default=0)
+    total = models.DecimalField(max_digits=17, decimal_places=2, default=0)
+    tax_total = models.DecimalField(max_digits=17, decimal_places=2, default=0)
+    issues = models.JSONField(default=list, blank=True)
+    note = models.CharField(max_length=250, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [models.Index(fields=("owner", "period", "-created_at"), name="closure_owner_period")]

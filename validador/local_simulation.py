@@ -27,11 +27,11 @@ def simulate_local_invoice_submission(invoice_batch):
         "simulated_at": simulated_at,
         "document_type": invoice_batch.get(
             "document_type",
-            "factura_electronica_internal_demo",
+            "factura_electronica_internal_batch",
         ),
         "status": "simulation_passed" if is_ready else "simulation_blocked",
         "message": (
-            "Los documentos superaron los controles internos de demostración. "
+            "Los documentos superaron los controles internos del lote. "
             "No se generó un comprobante fiscal y no se transmitió nada a Hacienda."
             if is_ready
             else "Simulación bloqueada: corrige los datos marcados para revisión. "

@@ -1561,7 +1561,7 @@ class ExpenseValidationTests(TestCase):
         self.assertContains(response, "Factura electrónica")
         self.assertContains(response, "Tiquete electrónico")
         self.assertContains(response, "Nota de crédito electrónica")
-        self.assertContains(response, "no se transmite a TRIBU-CR/Hacienda")
+        self.assertContains(response, "resumen interno para revisión")
         self.assertContains(response, 'style="width: 100.0%"')
 
         downloaded = self.client.get(reverse("download_invoice_model"))
@@ -2021,7 +2021,7 @@ class MockLoginTests(TestCase):
     def test_login_page_shows_demo_username(self):
         response = self.client.get(reverse("login"))
         self.assertContains(response, "demo")
-        self.assertContains(response, "No usar en producción")
+        self.assertContains(response, "En producción se desactiva")
 
     def test_valid_mock_credentials_create_session(self):
         response = self.client.post(
@@ -2076,7 +2076,7 @@ class DesignPreferenceTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse("index"),
+            reverse("dashboard"),
             fetch_redirect_response=False,
         )
         preference = UserDesignPreference.objects.get(user__username="demo")
@@ -2111,7 +2111,7 @@ class DesignPreferenceTests(TestCase):
         recommend_design.assert_called_once_with("Formal y sobrio para finanzas")
         self.assertRedirects(
             response,
-            reverse("index"),
+            reverse("dashboard"),
             fetch_redirect_response=False,
         )
         preference = UserDesignPreference.objects.get(user__username="demo")

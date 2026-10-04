@@ -1,4 +1,4 @@
-# Prototipo empresarial: análisis de tablas y gastos
+# GuanaBill: facturación electrónica para Hacienda
 
 Aplicación inicial en Django para analizar tablas CSV/TSV/XLSX con encabezados dinámicos, mostrar una vista previa, recomendar y generar un gráfico, y descargar un reporte. Conserva reglas adicionales para planillas de gastos y la carga condicional a SharePoint.
 
@@ -40,7 +40,7 @@ el procesador disponibles.
 
 Abre <http://127.0.0.1:8000/> e inicia sesión con el usuario mock `demo` y la contraseña `Demo123!`. La cuenta mock solo se habilita con `DJANGO_DEBUG=true` (valor local predeterminado) y no debe usarse en producción. Puedes cambiar el usuario y la contraseña de desarrollo con `DEMO_USERNAME` y `DEMO_PASSWORD`.
 
-Después del primer inicio de sesión, el prototipo presenta un selector de estilo (minimalista, abstracto o corporativo). Puedes describir el ambiente visual deseado y pedir una recomendación; la IA selecciona y aplica automáticamente uno de los temas permitidos. La preferencia se guarda por usuario y se puede cambiar luego con “Cambiar diseño”. No se envían datos de archivos a esa recomendación.
+Después del primer inicio de sesión, GuanaBill presenta un selector de estilo (minimalista, abstracto o corporativo). Puedes describir el ambiente visual deseado y pedir una recomendación; la IA selecciona y aplica automáticamente uno de los temas permitidos. La preferencia se guarda por usuario y se puede cambiar luego con “Cambiar diseño”. No se envían datos de archivos a esa recomendación.
 
 Ollama local es el proveedor predeterminado. Configura `OLLAMA_BASE_URL` para cambiar su dirección y `OLLAMA_MODEL` para seleccionar otro modelo ya descargado. Para usar OpenAI en lugar del modelo local, configura `AI_PROVIDER=openai` y `OPENAI_API_KEY` en el entorno. Sin un proveedor de IA disponible, la validación determinista y la selección manual de tema siguen funcionando.
 
@@ -150,7 +150,7 @@ autenticada, token CSRF y un archivo en el campo `archivo`, igual que el endpoin
 de preparación. La ruta responde 404 cuando `DEBUG` está desactivado. La
 respuesta declara `real_hacienda_contacted: false` y `real_submission: false`.
 La simulación no contiene un cliente HTTP de remisión: ejecuta únicamente los
-controles internos de demostración.
+controles internos del lote.
 
 El flujo actual analiza facturas recibidas de proveedores como gastos; no es un
 sistema para emitir comprobantes a nombre del usuario. El esquema es una
@@ -159,7 +159,7 @@ costarricense. No incluye todavía emisor/receptor, líneas de detalle, códigos
 CABYS, actividad económica, firma digital ni estructura XML. La interfaz muestra
 un catálogo de trabajo de factura electrónica, tiquete electrónico, notas de
 crédito y débito, factura de compra y de exportación. Solo la primera tiene una
-demo genérica y ninguna está implementada o validada para envío fiscal. Cada
+disponible y ninguna está implementada o validada para envío fiscal. Cada
 tipo requiere su propio perfil de datos y reglas cotejados con documentación
 oficial vigente; no se simulan como tipos compatibles por solo cambiarles el
 nombre.
@@ -368,4 +368,13 @@ compuesto **Django + Gateway** para depurar ambos. Primera vez: `pip install -r 
 Datos de prueba locales: `python manage.py seed_guanabill` crea el usuario `proveedor_prueba`
 (`Proveedor123!`), una API key y 3 facturas de ejemplo. Solo funciona con `HACIENDA_MODE=local`.
 Las API keys se guardan hasheadas (SHA-256) y se muestran una sola vez.
+
+
+## Flujo de la aplicación
+
+- **Panel** (/panel/): resumen del periodo.
+- **Facturas** (/facturas/emitidas/): administración, envío, anulación y corrección.
+- **Nueva factura** (/facturas/nueva/) o **Importar Excel/CSV** (/facturas/importar/, plantilla incluida) o la API REST (/integraciones/).
+- **Cierres** (/cierres/): validador por periodo (AAAA-MM); bloquea si hay borradores, rechazadas, en cola o totales inconsistentes.
+- **Bitácora** (/bitacora/): facturas y cierres aceptados o rechazados, con exportación CSV.
 

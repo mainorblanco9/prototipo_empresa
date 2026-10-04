@@ -1,0 +1,27 @@
+{% extends 'validador/_shell.html' %}
+{% block title %}Bitácora{% endblock %}
+{% block heading %}Bitácora{% endblock %}
+{% block content %}
+<div class="gb-card mb-3">
+  <form method="get" class="row g-2 align-items-end">
+    <div class="col-6 col-md-3"><label class="form-label small fw-bold">Tipo</label>
+      <select class="form-select" name="tipo"><option value="">Facturas y cierres</option><option value="facturas" {% if kind == 'facturas' %}selected{% endif %}>Solo facturas</option><option value="cierres" {% if kind == 'cierres' %}selected{% endif %}>Solo cierres</option></select></div>
+    <div class="col-6 col-md-3"><label class="form-label small fw-bold">Resultado</label>
+      <select class="form-select" name="resultado"><option value="">Todos</option><option value="aceptados" {% if outcome == 'aceptados' %}selected{% endif %}>Aceptados</option><option value="rechazados" {% if outcome == 'rechazados' %}selected{% endif %}>Rechazados</option></select></div>
+    <div class="col-6 col-md-3"><label class="form-label small fw-bold">Periodo</label><input class="form-control" type="month" name="period" value="{{ period }}"></div>
+    <div class="col-6 col-md-3 d-flex gap-2"><button class="btn btn-primary" type="submit">Filtrar</button>
+      <a class="btn btn-outline-primary" href="?tipo={{ kind }}&resultado={{ outcome }}&period={{ period }}&formato=csv">CSV</a></div>
+  </form>
+</div>
+<div class="gb-card">
+  <div class="table-responsive"><table class="table gb-table mb-0">
+    <thead><tr><th>Fecha</th><th>Tipo</th><th>Resultado</th><th>Periodo</th><th>Detalle</th></tr></thead>
+    <tbody>
+    {% for i in items %}
+      <tr><td class="text-nowrap">{{ i.when|date:"d/m/Y H:i" }}</td><td>{{ i.kind }}</td>
+        <td><span class="gb-badge {{ i.tone }}">{{ i.title }}</span></td><td>{{ i.period }}</td><td class="small text-secondary" style="word-break:break-word">{{ i.detail }}</td></tr>
+    {% empty %}<tr><td colspan="5" class="text-secondary">No hay registros con esos filtros.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

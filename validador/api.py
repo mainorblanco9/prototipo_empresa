@@ -23,7 +23,7 @@ from .issued_invoice import (
     TAX_RATES,
     build_issued_invoice_draft,
 )
-from . import ai_assist, hacienda
+from . import ai_assist, hacienda, periods
 from .models import IssuedInvoice, IssuedInvoiceStatusEvent
 
 
@@ -247,6 +247,8 @@ class IssuedInvoiceViewSet(GenericViewSet):
         existing = self.get_queryset().filter(client_id=data["client_id"]).first()
         if existing:
             return Response(InvoiceDetailSerializer(existing).data)
+        if periods.is_closed(request.user, periods.period_of(data["issue_date"])):
+            return _conflict("El periodo de esa fecha está cerrado. Reabre el periodo en Cierres para modificarlo.")
         try:
             document = _build_document(data)
         except IssuedInvoiceDraftError as exc:
@@ -281,6 +283,8 @@ class IssuedInvoiceViewSet(GenericViewSet):
             return _bad_request("Falta version para detectar cambios simultáneos.")
         if invoice.status != IssuedInvoice.Status.DRAFT:
             return _conflict("Solo se pueden editar facturas en borrador.")
+        if periods.is_closed(request.user, periods.period_of(data["issue_date"])):
+            return _conflict("El periodo de esa fecha está cerrado. Reabre el periodo en Cierres para modificarlo.")
         try:
             document = _build_document(data)
         except IssuedInvoiceDraftError as exc:
@@ -572,7 +576,7 @@ class ApiRootView(APIView):
                 "currency": "CRC",
                 "official_tribucr_integration": False,
                 "note": (
-                    "Borradores locales no fiscales; no se transmiten a Hacienda."
+                    "API de facturación GuanaBill. En el sandbox local las facturas se envían al simulador de Hacienda."
                 ),
             }
         )

@@ -60,10 +60,10 @@ INVOICE_BATCH_TTL_SECONDS = 600
 
 def login_view(request):
     if not settings.DEBUG or not settings.DEMO_LOGIN_ENABLED:
-        return HttpResponseNotFound("El inicio de sesión de demostración está desactivado.")
+        return HttpResponseNotFound("El acceso de prueba está desactivado.")
 
     if request.user.is_authenticated:
-        return redirect("index")
+        return redirect("dashboard")
 
     context = {"demo_username": settings.DEMO_USERNAME}
     if request.method == "POST":
@@ -78,7 +78,7 @@ def login_view(request):
                 defaults={"is_staff": False, "is_superuser": False},
             )
             if not user.is_active or user.is_staff or user.is_superuser:
-                context["error"] = "La cuenta de demostración no está habilitada."
+                context["error"] = "La cuenta de prueba no está habilitada."
                 return render(request, "validador/login.html", context, status=403)
             if not user.has_usable_password():
                 user.set_unusable_password()
@@ -97,7 +97,7 @@ def login_view(request):
                 next_url, allowed_hosts={request.get_host()}
             ):
                 return redirect(next_url)
-            return redirect("index")
+            return redirect("dashboard")
         context["error"] = "Usuario o contraseña incorrectos."
         return render(request, "validador/login.html", context, status=401)
 
@@ -178,7 +178,7 @@ def _redirect_after_design_save(request):
         next_url, allowed_hosts={request.get_host()}
     ):
         return redirect(next_url)
-    return redirect("index")
+    return redirect("dashboard")
 
 
 def logout_view(request):

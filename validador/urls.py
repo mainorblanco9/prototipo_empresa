@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import api, pwa, views
+from . import api, app_views, invoice_import, pwa, views
 
 urlpatterns = [
     path("api/v1/", api.ApiRootView.as_view(), name="api_root"),
@@ -58,6 +58,12 @@ urlpatterns = [
     path("api/v1/ai/review-draft/", api.DraftReviewView.as_view(), name="api_ai_review_draft"),
     path("facturas/nueva/", views.invoice_wizard, name="invoice_wizard"),
     path("integraciones/", views.integrations, name="integrations"),
+    path("api/v1/invoices/import/", invoice_import.InvoiceImportView.as_view(), name="api_invoice_import"),
+    path("panel/", app_views.dashboard, name="dashboard"),
+    path("cierres/", app_views.closures, name="closures"),
+    path("bitacora/", app_views.activity_log, name="activity_log"),
+    path("facturas/importar/", app_views.import_invoices, name="import_invoices"),
+    path("facturas/importar/plantilla.csv", app_views.import_template, name="import_template"),
     path("manifest.webmanifest", pwa.manifest, name="pwa_manifest"),
     path("sw.js", pwa.service_worker, name="pwa_service_worker"),
     path("icon.svg", pwa.icon, name="pwa_icon"),

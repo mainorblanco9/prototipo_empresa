@@ -3,10 +3,9 @@ INVOICE_DOCUMENT_PROFILES = (
         "code": "factura_electronica",
         "name": "Factura electrónica",
         "status": "available",
-        "status_label": "Borrador interno genérico",
+        "status_label": "Disponible",
         "detail": (
-            "El prototipo analiza una fila de gastos por factura. No incluye "
-            "emisor, receptor, líneas de detalle ni el XML fiscal oficial."
+            "Emisión por API REST, carga Excel/CSV o captura factura a factura, con clave numérica, XML y envío a Hacienda."
         ),
     },
     {

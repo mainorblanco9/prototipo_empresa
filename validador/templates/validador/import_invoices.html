@@ -1,0 +1,57 @@
+{% extends 'validador/_shell.html' %}
+{% block title %}Importar Excel{% endblock %}
+{% block heading %}Importar facturas desde Excel{% endblock %}
+{% block content %}
+<div class="gb-card mb-3">
+  <p class="mb-2">Una fila por línea de factura; las filas con el mismo número de <code>factura</code> forman un comprobante. Acepta <strong>.xlsx</strong> y <strong>.csv</strong>.</p>
+  <a class="btn btn-outline-primary btn-sm mb-3" href="{% url 'import_template' %}">Descargar plantilla</a>
+  <form id="f" class="d-flex gap-2 flex-wrap">
+    <input class="form-control" style="max-width:380px" type="file" id="file" accept=".csv,.xlsx" required>
+    <button class="btn btn-outline-primary" type="submit">Validar archivo</button>
+    <button class="btn btn-primary" type="button" id="confirm" disabled>Crear facturas válidas</button>
+  </form>
+  <div id="msg" class="mt-3"></div>
+</div>
+<div class="gb-card" id="res" hidden>
+  <div class="table-responsive"><table class="table gb-table mb-0">
+    <thead><tr><th>Factura</th><th>Receptor</th><th class="text-end">Total</th><th>Resultado</th></tr></thead><tbody id="rows"></tbody>
+  </table></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const $ = (id) => document.getElementById(id);
+const csrf = () => document.querySelector("[name=csrfmiddlewaretoken]").value;
+async function send(confirm) {
+  const body = new FormData(); body.append("file", $("file").files[0]); if (confirm) body.append("confirm", "1");
+  const res = await fetch("/api/v1/invoices/import/", { method: "POST", body, credentials: "same-origin", headers: { "X-CSRFToken": csrf() } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || "Error al procesar el archivo.");
+  return data;
+}
+function render(d) {
+  $("res").hidden = false; const rows = $("rows"); rows.replaceChildren();
+  const labels = { valid: ["ready", "Válida"], created: ["accepted", "Creada"], exists: ["draft", "Ya existía"], error: ["rejected", ""] };
+  d.results.forEach(r => {
+    const tr = rows.insertRow(); tr.insertCell().textContent = r.factura || "(sin número)";
+    tr.insertCell().textContent = r.receiver || "—";
+    const t = tr.insertCell(); t.className = "text-end"; t.textContent = r.total ? "₡" + Number(r.total).toLocaleString("es-CR", { minimumFractionDigits: 2 }) : "—";
+    const s = tr.insertCell(), b = document.createElement("span"); const [cls, txt] = labels[r.status];
+    b.className = "gb-badge " + cls; b.textContent = txt || r.errors.join(" "); s.appendChild(b);
+  });
+}
+$("f").onsubmit = async (e) => {
+  e.preventDefault(); $("msg").textContent = "Validando…"; $("confirm").disabled = true;
+  try {
+    const d = await send(false); render(d);
+    $("msg").textContent = `${d.valid} válidas · ${d.with_errors} con errores de ${d.total}.`;
+    $("confirm").disabled = d.valid === 0;
+  } catch (err) { $("msg").textContent = err.message; }
+};
+$("confirm").onclick = async () => {
+  $("confirm").disabled = true;
+  try { const d = await send(true); render(d); $("msg").innerHTML = `Se crearon ${d.created} facturas. <a href="{% url 'issued_invoice_list' %}">Ir a Facturas</a>`; }
+  catch (err) { $("msg").textContent = err.message; }
+};
+</script>
+{% endblock %}
