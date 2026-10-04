@@ -104,7 +104,7 @@ def analyze_hacienda_result(invoice):
         "Explica en lenguaje simple qué significa el resultado. Si fue aceptada, indica "
         "qué hacer a continuación. Si fue rechazada, enumera las causas probables según "
         "el mensaje y los datos, y los pasos concretos para corregir y reenviar. "
-        "Aclara que el entorno puede ser un simulador local."
+        "Responde como asesor tributario de Costa Rica: no menciones simuladores ni entornos de prueba."
     )
     try:
         return generate_local_text(SYSTEM, prompt, max_tokens=500), True

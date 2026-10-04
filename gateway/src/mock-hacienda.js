@@ -17,11 +17,31 @@ function reject(cause) {
   return json(400, null, { "X-Error-Cause": cause });
 }
 
-function mensajeHacienda({ clave, accepted, detail }) {
-  const code = accepted ? "1" : "3";
+const RECHAZOS = [
+  ["-37", "El código de actividad económica del emisor no está registrado o no corresponde a la línea de detalle."],
+  ["-43", "El código CABYS de una línea de detalle no existe en el catálogo vigente."],
+  ["-52", "El monto total del impuesto no coincide con la suma de los impuestos de las líneas de detalle."],
+  ["-64", "La identificación del receptor no se encuentra inscrita en el Registro de Contribuyentes."],
+  ["-79", "La tarifa de IVA declarada no corresponde al código de tarifa indicado para la línea."],
+];
+
+const tag = (xml, name) => new RegExp(`<${name}>([^<]*)</${name}>`).exec(xml)?.[1] ?? "";
+const esc = (v) => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function mensajeHacienda({ clave, accepted, detail, code, xml = "" }) {
+  const fecha = new Date().toISOString();
+  const emisor = tag(xml, "NumeroCedulaEmisor") || tag(xml, "Numero");
+  const total = tag(xml, "TotalComprobante");
   return Buffer.from(
-    `<?xml version="1.0" encoding="utf-8"?><MensajeHacienda><Clave>${clave}</Clave>` +
-      `<Mensaje>${code}</Mensaje><DetalleMensaje>${detail}</DetalleMensaje></MensajeHacienda>`,
+    `<?xml version="1.0" encoding="utf-8"?>` +
+      `<MensajeHacienda xmlns="https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/mensajeHacienda">` +
+      `<Clave>${clave}</Clave>` +
+      (emisor ? `<NombreEmisor>${esc(tag(xml, "Nombre"))}</NombreEmisor><NumeroCedulaEmisor>${esc(emisor)}</NumeroCedulaEmisor>` : "") +
+      `<FechaRespuesta>${fecha}</FechaRespuesta>` +
+      (total ? `<TotalFactura>${esc(total)}</TotalFactura>` : "") +
+      `<Mensaje>${accepted ? "1" : "3"}</Mensaje><DetalleMensaje>${esc(detail)}</DetalleMensaje>` +
+      (code ? `<CodigoRechazo>${code}</CodigoRechazo>` : "") +
+      `</MensajeHacienda>`,
   ).toString("base64");
 }
 
@@ -88,6 +108,7 @@ export function createMockHacienda() {
           fecha: data.fecha,
           polls: 0,
           wantsReject: xml.includes("RECHAZAR"),
+          xml,
         });
         return json(202, null, { Location: `/recepcion/${data.clave}` });
       }
@@ -106,9 +127,13 @@ export function createMockHacienda() {
           "respuesta-xml": mensajeHacienda({
             clave: receipt.clave,
             accepted,
-            detail: accepted
-              ? "Comprobante aceptado (simulador local)"
-              : "Comprobante rechazado (simulador local)",
+            xml: receipt.xml,
+            ...(accepted
+              ? { detail: "Comprobante electrónico aceptado por la Dirección General de Tributación." }
+              : (() => {
+                  const [code, text] = RECHAZOS[Number(receipt.clave.slice(-3)) % RECHAZOS.length];
+                  return { code, detail: `[${code}] ${text}` };
+                })()),
           }),
         });
       }
